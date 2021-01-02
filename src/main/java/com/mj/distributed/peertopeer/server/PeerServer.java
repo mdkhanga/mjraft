@@ -293,6 +293,8 @@ public class PeerServer implements NioListenerConsumer {
         if (e != null) {
 
             // LOG.info("We have an entry") ;
+            // LOG.info("Received last committed index "+lastComittedIndex);
+            // LOG.info("Our last committed index " + this.lastComittedIndex.get()) ;
 
             int position = e.getIndex();
             byte[] data = e.getEntry();
@@ -318,6 +320,7 @@ public class PeerServer implements NioListenerConsumer {
         } else {
             // LOG.info("No entry") ;
         }
+
 
         if (lastComittedIndex < rlog.size() && lastComittedIndex > this.lastComittedIndex.get()) {
             LOG.info("Setting committed index to "+lastComittedIndex);
@@ -546,7 +549,10 @@ public class PeerServer implements NioListenerConsumer {
 
 
         peer.queueSendMessage(p);
-        ackCountMap.put(index, new ConcurrentLinkedQueue<Integer>());
+
+        ConcurrentLinkedQueue<Integer> q = new ConcurrentLinkedQueue<Integer>();
+        q.add(1); // self
+        ackCountMap.put(index, q);
 
     }
 
