@@ -14,8 +14,9 @@ This is work in progress.
 
 mvn clean install
 
-### command line
+### Command line
 
+....
 
 ### Embedded
 
