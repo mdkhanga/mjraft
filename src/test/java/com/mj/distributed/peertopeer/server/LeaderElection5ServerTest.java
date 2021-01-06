@@ -28,23 +28,23 @@ public class LeaderElection5ServerTest {
     public static void init() throws Exception {
         System.out.println("running init") ;
 
-        server1 = new PeerServer(1, 7001, RaftState.leader);
-        server1.start(null) ;
+        server1 = new PeerServer(7001);
+        server1.start() ;
 
         String[] seeds = new String[1];
         seeds[0] = "localhost:7001";
 
-        server2 = new PeerServer(2, 7002,RaftState.follower);
-        server2.start(seeds);
+        server2 = new PeerServer(2, 7002, seeds);
+        server2.start();
 
-        server3 = new PeerServer(3, 7003, RaftState.follower);
-        server3.start(seeds);
+        server3 = new PeerServer(3, 7003, seeds);
+        server3.start();
 
-        server4 = new PeerServer(4, 7004, RaftState.follower);
-        server4.start(seeds);
+        server4 = new PeerServer(4, 7004, seeds);
+        server4.start();
 
-        server5 = new PeerServer(5, 7005, RaftState.follower);
-        server5.start(seeds);
+        server5 = new PeerServer(5, 7005, seeds);
+        server5.start();
 
         Thread.sleep(10000);
 

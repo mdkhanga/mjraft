@@ -79,8 +79,27 @@ public class PeerServer implements NioListenerConsumer {
     private volatile int currentVotedTerm = -1;
     private volatile long currentVoteTimeStamp = 0;
 
-    public PeerServer(int id, RaftState state) {
+    private String[] seeds;
 
+
+    public PeerServer(int bindPort) {
+        _peerServer(1, bindPort, RaftState.leader);
+    }
+
+    public PeerServer(int id, int bindPort, String[] s) {
+
+        seeds = s ;
+
+        if (seeds == null  || seeds.length == 0) {
+            _peerServer(1, bindPort, RaftState.leader);
+        } else {
+            _peerServer(id, bindPort, RaftState.follower) ;
+        }
+    }
+
+    public PeerServer(int id, String[] s, RaftState state) {
+
+        seeds = s;
         serverId = new AtomicInteger(id) ;
         bindPort = 5000+serverId.get() ;
         _peerServer(id, 5000+serverId.get(),state);
@@ -97,13 +116,13 @@ public class PeerServer implements NioListenerConsumer {
     public void _peerServer(int id, int port, RaftState state) {
 
         bindPort = port;
-
+        serverId = new AtomicInteger(id) ;
         raftState = state ;
         inBoundMessageCreator = new InBoundMessageCreator(this);
     }
 
-    public void start(String[] seed) throws Exception {
-
+    // public void start(String[] seed) throws Exception {
+    public void start() throws Exception {
 
         thisMember = new Member(bindHost, bindPort, true) ;
 
@@ -116,13 +135,12 @@ public class PeerServer implements NioListenerConsumer {
         members.add(thisMember);
 
 
-        if (seed != null) {
-            for (String s : seed) {
-
+        if (seeds != null) {
+            for (String s : seeds) {
 
                 String[] remoteaddrAndPort = s.split(":") ;
 
-                LOG.info("Connecting to " + seed) ;
+                LOG.info("Connecting to " + s) ;
                 PeerClient peer = new PeerClient(remoteaddrAndPort[0],Integer.parseInt(remoteaddrAndPort[1]),this);
                 peer.start();
                 HelloMessage m = new HelloMessage(getBindHost(),getBindPort());
@@ -373,8 +391,8 @@ public class PeerServer implements NioListenerConsumer {
 
         System.out.println("Starting server with serverId:" + serverId) ;
 
-        PeerServer peerServer = new PeerServer(serverId, state) ;
-        peerServer.start(seeds) ;
+        PeerServer peerServer = new PeerServer(serverId, seeds, state) ;
+        peerServer.start() ;
     }
 
     public void addedConnection(SocketChannel s) {
