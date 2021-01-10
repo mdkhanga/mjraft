@@ -161,6 +161,8 @@ public class ServerMessageHandlerCallable implements Callable {
             } else if (messageType == MessageType.RaftClientHello.value()) {
 
                 LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
+                peerServer.addRaftClient(socketChannel);
+                peerServer.queueSendMessage(socketChannel, new RaftClientHelloResponse());
 
             } else if (messageType == MessageType.RaftClientAppendEntry.value()) {
 

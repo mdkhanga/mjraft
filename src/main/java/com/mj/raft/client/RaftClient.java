@@ -1,9 +1,10 @@
 package com.mj.raft.client;
 
-import com.mj.distributed.message.RaftClientAppendEntry;
-import com.mj.distributed.message.RaftClientHello;
+import com.mj.distributed.message.*;
 import com.mj.distributed.tcp.nio.NioCaller;
 import com.mj.distributed.tcp.nio.NioCallerConsumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Console;
 import java.nio.ByteBuffer;
@@ -11,12 +12,17 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RaftClient implements NioCallerConsumer {
 
     private String hostString;
     private int port;
     NioCaller nioCaller;
+    private final AtomicInteger seq = new AtomicInteger(1);
+    private Integer messageWaitingResponse ;
+    private volatile Message response;
+    Logger LOG = LoggerFactory.getLogger(RaftClient.class);
 
     public RaftClient(String host, int port) {
 
@@ -29,7 +35,21 @@ public class RaftClient implements NioCallerConsumer {
         nioCaller = new NioCaller(hostString, port, "raftclient",-1,this);
         nioCaller.start();
         RaftClientHello hello = new RaftClientHello();
+        messageWaitingResponse = 0 ;
         nioCaller.queueSendMessage(hello.serialize());
+
+        synchronized (messageWaitingResponse) {
+
+            while(response == null ) {
+
+                messageWaitingResponse.wait();
+
+            }
+
+            RaftClientHelloResponse r = (RaftClientHelloResponse) response ;
+            response = null ;
+        }
+
 
     }
 
@@ -45,9 +65,23 @@ public class RaftClient implements NioCallerConsumer {
 
     }
 
-    public List<Integer> get(int start, int count) {
+    public List<byte[]> get(int start, int count) throws Exception {
 
-        return new ArrayList<Integer>() ;
+        Integer id = seq.getAndIncrement();
+        GetServerLog gsLog = new GetServerLog(id, 0, count, (byte)0);
+        nioCaller.queueSendMessage(gsLog.serialize());
+        messageWaitingResponse = id;
+        synchronized (messageWaitingResponse) {
+
+            while(response == null ) {
+
+                messageWaitingResponse.wait();
+
+            }
+
+            GetServerLogResponse r = (GetServerLogResponse) response ;
+            return r.getEntries();
+        }
     }
 
     public void addedConnection(SocketChannel s) {
@@ -60,6 +94,30 @@ public class RaftClient implements NioCallerConsumer {
 
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
 
+        try {
+
+            LOG.info("Raft client Received a response message "+numBytes);
+
+            synchronized (messageWaitingResponse) {
+
+                // FIXME: could be a partial message or multiple messages
+                int messageSize = b.getInt();
+                int messageType = b.getInt() ;
+
+                if (messageType == MessageType.RaftClientHelloResponse.value()) {
+                    response = RaftClientHelloResponse.deserialize(b.rewind());
+                    messageWaitingResponse.notify();
+                } else if (messageType == MessageType.GetServerLogResponse.value()) {
+                    response = GetServerLogResponse.deserialize(b.rewind());
+                    messageWaitingResponse.notify();
+                } else  {
+                    throw new RuntimeException("RaftClient received unknown message");
+                }
+
+            }
+        } catch(Exception e) {
+            LOG.error("Error deserializing message",e) ;
+        }
 
 
     }
@@ -79,9 +137,6 @@ public class RaftClient implements NioCallerConsumer {
             client.send(Integer.valueOf(s));
 
         }
-
-
-
     }
 
 }
