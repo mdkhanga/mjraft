@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class PeerServer implements NioListenerConsumer {
 
-    private AtomicInteger serverId ;
+    private int serverId ;
 
 
     private final ConcurrentMap<Member, Peer> connectedMembersMap = new ConcurrentHashMap<>() ;
@@ -72,6 +72,7 @@ public class PeerServer implements NioListenerConsumer {
     private volatile boolean stop = false ;
 
     private volatile int leaderId = -1;
+    private volatile AtomicInteger serverIdGenerator = new AtomicInteger(1);
     private volatile boolean electionInProgress = false ;
     private volatile int currentElectionTerm = -1 ;
     private volatile LeaderElection leaderElection ;
@@ -83,40 +84,49 @@ public class PeerServer implements NioListenerConsumer {
 
 
     public PeerServer(int bindPort) {
-        _peerServer(1, bindPort, RaftState.leader);
+        _peerServer( bindPort, RaftState.leader);
     }
 
-    public PeerServer(int id, int bindPort, String[] s) {
+    public PeerServer(int bindPort, String[] s) {
 
         seeds = s ;
 
         if (seeds == null  || seeds.length == 0) {
-            _peerServer(1, bindPort, RaftState.leader);
+            _peerServer( bindPort, RaftState.leader);
         } else {
-            _peerServer(id, bindPort, RaftState.follower) ;
+            _peerServer( bindPort, RaftState.follower) ;
         }
     }
 
-    public PeerServer(int id, String[] s, RaftState state) {
+    /* public PeerServer( int port, String[] s, RaftState state) {
 
         seeds = s;
-        serverId = new AtomicInteger(id) ;
-        bindPort = 5000+serverId.get() ;
-        _peerServer(id, 5000+serverId.get(),state);
+        // serverId = new AtomicInteger(id) ;
+        if (s == null || s.length == 0) {
+            serverId = serverIdGenerator.incrementAndGet() ;
+        }
 
-    }
+        _peerServer( port, state);
 
-    public PeerServer(int id, int port, RaftState state) {
+    } */
 
-        serverId = new AtomicInteger(id) ;
-        _peerServer(id, port, state);
+    /* public PeerServer(int port, RaftState state) {
 
-    }
+        // serverId = new AtomicInteger(id) ;
+        _peerServer(port, state);
 
-    public void _peerServer(int id, int port, RaftState state) {
+    } */
+
+    public void _peerServer( int port, RaftState state) {
 
         bindPort = port;
-        serverId = new AtomicInteger(id) ;
+        // serverId = new AtomicInteger(id) ;
+
+        LOG.info("Starting server on port: " + port + " state: "+ state);
+        if (serverId > 0) {
+            LOG.info("ServerId is "+ serverId);
+        }
+
         raftState = state ;
         inBoundMessageCreator = new InBoundMessageCreator(this);
     }
@@ -212,7 +222,7 @@ public class PeerServer implements NioListenerConsumer {
     }
 
     public int getServerId() {
-        return serverId.get();
+        return serverId;
     }
 
     public List<Member> getMembers() {
@@ -369,11 +379,12 @@ public class PeerServer implements NioListenerConsumer {
             System.out.println("Need at least 1 argurment") ;
         }
 
-        int serverId = Integer.parseInt(args[0]) ;
+        // int serverId = Integer.parseInt(args[0]) ;
+        int port = Integer.parseInt(args[0]) ;
 
         int size = args.length   ;
 
-        RaftState state = RaftState.follower ;
+        // RaftState state = RaftState.follower ;
 
         String[] seeds = null ;
 
@@ -386,12 +397,12 @@ public class PeerServer implements NioListenerConsumer {
             }
 
         } else {
-            state = RaftState.leader;
+            // state = RaftState.leader;
         }
 
-        System.out.println("Starting server with serverId:" + serverId) ;
+        System.out.println("Starting server listening on port: " + port) ;
 
-        PeerServer peerServer = new PeerServer(serverId, seeds, state) ;
+        PeerServer peerServer = new PeerServer( port, seeds) ;
         peerServer.start() ;
     }
 
@@ -492,8 +503,9 @@ public class PeerServer implements NioListenerConsumer {
 
                             // peerServer.setElectionInProgress(incrementTerm());
 
-                            // int randomDelay = (int)(900 + Math.random()*200*serverId.get());
-                            int randomDelay = (int)(900 + 400*serverId.get());
+                            // int randomDelay = (int)(900 + 400*serverId);
+                            int randomDelay = Utils.getRandomDelay();
+                            // LOG.info("Got randoom Delay " + randomDelay);
 
                             long timeSinceLastLeadetBeat = System.currentTimeMillis() -
                                     peerServer.getlastLeaderHeartBeatts();
@@ -513,8 +525,9 @@ public class PeerServer implements NioListenerConsumer {
 
                     } else if (raftState.equals(RaftState.follower)) {
 
-                        // int randomDelay = (int)(900 + Math.random()*200*serverId.get());
-                        int randomDelay = (int)(900 + 400*serverId.get());
+                        // int randomDelay = (int)(900 + 400*serverId);
+                        int randomDelay = Utils.getRandomDelay();
+                        // LOG.info("Got random Delay " + randomDelay);
 
                         long timeSinceLastLeadetBeat = System.currentTimeMillis() -
                             peerServer.getlastLeaderHeartBeatts();
@@ -544,7 +557,7 @@ public class PeerServer implements NioListenerConsumer {
         Member m = peer.member();
         PeerData v = memberPeerDataMap.get(m);
 
-        AppendEntriesMessage p = new AppendEntriesMessage(getTerm(),serverId.get(),
+        AppendEntriesMessage p = new AppendEntriesMessage(getTerm(),serverId,
                 v.getNextSeq(),
                 rlog.size()-1,
                 lastComittedIndex.get());

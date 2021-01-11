@@ -34,10 +34,10 @@ public class PeerServerTest {
         String[] seeds = new String[1];
         seeds[0] = "localhost:5001";
 
-        server1 = new PeerServer(2, 5002, seeds);
+        server1 = new PeerServer(5002, seeds);
         server1.start();
 
-        server2 = new PeerServer(3, 5003, seeds);
+        server2 = new PeerServer(5003, seeds);
         server2.start();
 
         Thread.sleep(15000);

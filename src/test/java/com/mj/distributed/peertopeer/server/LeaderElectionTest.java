@@ -34,10 +34,10 @@ public class LeaderElectionTest {
         String[] seeds = new String[1];
         seeds[0] = "localhost:6001";
 
-        server1 = new PeerServer(2, 6002, seeds);
+        server1 = new PeerServer(6002, seeds);
         server1.start();
 
-        server2 = new PeerServer(3, 6003, seeds);
+        server2 = new PeerServer(6003, seeds);
         server2.start();
 
 
@@ -82,7 +82,7 @@ public class LeaderElectionTest {
 
 
         leader.stop();
-        Thread.sleep(30000);
+        Thread.sleep(35000);
 
         // check for new leader
         cs1 = ts2.getClusterInfo() ;
@@ -100,7 +100,7 @@ public class LeaderElectionTest {
         assertEquals(cs1.getLeader().getHostString(),cs2.getLeader().getHostString());
 
         // repeat
-        Thread.sleep(5000) ;
+        Thread.sleep(1000) ;
 
         cs1 = ts2.getClusterInfo() ;
         port = cs1.getLeader().getPort();
@@ -115,7 +115,6 @@ public class LeaderElectionTest {
         System.out.println("mj leader is "+cs2.getLeader().getHostString() +":"+ cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getPort(),cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getHostString(),cs2.getLeader().getHostString());
-
 
 
         ts.close();

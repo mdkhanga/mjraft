@@ -34,16 +34,16 @@ public class LeaderElection5ServerTest {
         String[] seeds = new String[1];
         seeds[0] = "localhost:7001";
 
-        server2 = new PeerServer(2, 7002, seeds);
+        server2 = new PeerServer( 7002, seeds);
         server2.start();
 
-        server3 = new PeerServer(3, 7003, seeds);
+        server3 = new PeerServer( 7003, seeds);
         server3.start();
 
-        server4 = new PeerServer(4, 7004, seeds);
+        server4 = new PeerServer( 7004, seeds);
         server4.start();
 
-        server5 = new PeerServer(5, 7005, seeds);
+        server5 = new PeerServer( 7005, seeds);
         server5.start();
 
         Thread.sleep(10000);
@@ -89,7 +89,7 @@ public class LeaderElection5ServerTest {
 
         System.out.println("Stopping server1") ;
         server1.stop();
-        Thread.sleep(30000);
+        Thread.sleep(35000);
 
         // check for new leader
         cs1 = ts2.getClusterInfo() ;
@@ -125,7 +125,7 @@ public class LeaderElection5ServerTest {
 
         System.out.println("Stopping server2") ;
         server2.stop();
-        Thread.sleep(30000);
+        Thread.sleep(35000);
 
         TestClient ts4 = new TestClient("localhost",7004);
         ts4.connect();
