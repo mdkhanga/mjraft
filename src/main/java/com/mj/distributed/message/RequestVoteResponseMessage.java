@@ -11,15 +11,17 @@ public class RequestVoteResponseMessage implements Message {
 
     private static MessageType messageType = MessageType.RequestVoteResponse ;
     private int term ;
-    private int candidateId ;
+    private String candidateHost ;
+    private int candidatePort;
     private boolean vote ; // true = yes
 
     private static Logger LOG  = LoggerFactory.getLogger(RequestVoteResponseMessage.class) ;
 
-    public RequestVoteResponseMessage(int term, int candidateId, boolean vote) {
+    public RequestVoteResponseMessage(int term, String candidateHost, int candidatePort, boolean vote) {
 
         this.term = term ;
-        this.candidateId = candidateId ;
+        this.candidateHost = candidateHost ;
+        this.candidatePort = candidatePort;
         this.vote = vote ;
 
     }
@@ -28,8 +30,16 @@ public class RequestVoteResponseMessage implements Message {
         return term ;
     }
 
-    public int getCandidateId() {
+    /* public int getCandidateId() {
         return candidateId ;
+    } */
+
+    public int getCandidatePort() {
+        return candidatePort;
+    }
+
+    public String getCandidateHost() {
+        return candidateHost ;
     }
 
     public boolean getVote() { return vote ;}
@@ -47,7 +57,12 @@ public class RequestVoteResponseMessage implements Message {
         DataOutputStream d = new DataOutputStream(b);
         d.writeInt(messageType.value());
         d.writeInt(term);
-        d.writeInt(candidateId);
+
+        byte[] hostStringBytes = candidateHost.getBytes("UTF-8") ;
+        d.writeInt(hostStringBytes.length);
+        d.write(hostStringBytes);
+
+        d.writeInt(candidatePort);
         if (vote) {
             d.writeByte(1);
         } else {
@@ -66,7 +81,7 @@ public class RequestVoteResponseMessage implements Message {
         return retBuffer ;
     }
 
-    public static RequestVoteResponseMessage deserialize(ByteBuffer readBuffer) {
+    public static RequestVoteResponseMessage deserialize(ByteBuffer readBuffer) throws Exception {
 
         int messagesize = readBuffer.getInt() ;
         // LOG.info("Received message of size " + messagesize) ;
@@ -77,14 +92,22 @@ public class RequestVoteResponseMessage implements Message {
         }
 
         int term = readBuffer.getInt() ;
-        int candidateId = readBuffer.getInt();
+        // int candidateId = readBuffer.getInt();
+        int hostStringSize = readBuffer.getInt() ;
+        byte[] hostStringBytes = new byte[hostStringSize] ;
+        readBuffer.get(hostStringBytes,0,hostStringSize) ;
+        String hostString = new String(hostStringBytes, "UTF-8") ;
+
+        int port = readBuffer.getInt() ;
+
+
         int b = readBuffer.get() ;
         boolean vote = false ;
         if ( b == 1) {
             vote = true ;
         }
 
-        return new RequestVoteResponseMessage(term, candidateId, vote) ;
+        return new RequestVoteResponseMessage(term, hostString, port, vote) ;
     }
 
 }

@@ -221,8 +221,8 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    public int getServerId() {
-        return serverId;
+    public String getServerId() {
+        return bindHost+":"+bindPort;
     }
 
     public List<Member> getMembers() {

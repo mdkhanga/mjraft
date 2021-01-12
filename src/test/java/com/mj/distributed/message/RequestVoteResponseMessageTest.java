@@ -14,7 +14,8 @@ public class RequestVoteResponseMessageTest {
 
         RequestVoteResponseMessage response = new RequestVoteResponseMessage(
                 3,
-                4,
+                "192.133.4.1",
+                 1234,
                 true
         );
 
@@ -23,7 +24,8 @@ public class RequestVoteResponseMessageTest {
         RequestVoteResponseMessage readResponse = RequestVoteResponseMessage.deserialize(b);
 
         assertTrue(3 == readResponse.getTerm());
-        assertTrue(4 == readResponse.getCandidateId());
+        assertTrue(1234 == readResponse.getCandidatePort());
+        assertTrue("192.133.4.1".equals(readResponse.getCandidateHost()));
         assertTrue(readResponse.getVote());
 
     }
@@ -32,7 +34,8 @@ public class RequestVoteResponseMessageTest {
 
         RequestVoteResponseMessage response = new RequestVoteResponseMessage(
                 3,
-                4,
+                "192.168.33.9",
+                5551,
                 false
         );
 
@@ -41,7 +44,6 @@ public class RequestVoteResponseMessageTest {
         RequestVoteResponseMessage readResponse = RequestVoteResponseMessage.deserialize(b);
 
         assertTrue(3 == readResponse.getTerm());
-        assertTrue(4 == readResponse.getCandidateId());
         assertFalse(readResponse.getVote());
 
     }

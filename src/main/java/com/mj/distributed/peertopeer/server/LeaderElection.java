@@ -84,7 +84,6 @@ public class LeaderElection implements Runnable {
 
                     RequestVoteMessage rv = new RequestVoteMessage(
                             newterm,
-                            server.getServerId(),
                             server.getBindHost(),
                             server.getBindPort(),
                             server.getLastCommittedEntry());

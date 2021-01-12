@@ -52,5 +52,7 @@ raftClient.send(23);
 
 #### Get log entries from leader
 
-
+```
+List<byte[]> serverValues = raftClient.get(0,1);
+```
 

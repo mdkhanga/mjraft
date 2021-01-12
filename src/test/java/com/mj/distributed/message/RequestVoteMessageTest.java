@@ -15,7 +15,6 @@ public class RequestVoteMessageTest {
 
         RequestVoteMessage requestVoteMessage = new RequestVoteMessage(
                 3,
-                1,
                 "192.168.5.21",
                 5050,
                 new LogEntry(33, 74)

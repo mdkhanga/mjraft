@@ -12,7 +12,7 @@ public class RequestVoteMessage implements Message {
 
     private static MessageType messageType = MessageType.RequestVote ;
     private int term;
-    private int candidateId;
+    // private int candidateId;
     private String candidateHost ;
     private int candidatePort ;
     private LogEntry lastCommittedLogEntry ;
@@ -20,13 +20,10 @@ public class RequestVoteMessage implements Message {
     private static Logger LOG  = LoggerFactory.getLogger(RequestVoteMessage.class) ;
 
     public RequestVoteMessage(int term,
-                              int id,
                               String host,
                               int port,
                               LogEntry lastLogEntry) {
-
         this.term = term ;
-        this.candidateId = candidateId ;
         this.candidateHost = host;
         this.candidatePort = port;
         this.lastCommittedLogEntry = lastLogEntry;
@@ -34,10 +31,6 @@ public class RequestVoteMessage implements Message {
 
     public int getTerm() {
         return term ;
-    }
-
-    public int getCandidateId() {
-        return candidateId ;
     }
 
     public String getCandidateHost() { return candidateHost ;}
@@ -60,7 +53,6 @@ public class RequestVoteMessage implements Message {
         DataOutputStream d = new DataOutputStream(b);
         d.writeInt(messageType.value());
         d.writeInt(term);
-        d.writeInt(candidateId);
         d.writeInt(hostStringBytes.length);
         d.write(hostStringBytes);
         d.writeInt(candidatePort);
@@ -93,8 +85,6 @@ public class RequestVoteMessage implements Message {
         }
 
         int term = readBuffer.getInt() ;
-        int candidateId = readBuffer.getInt();
-
 
         int hostStringSize = readBuffer.getInt() ;
         byte[] hostStringBytes = new byte[hostStringSize] ;
@@ -111,7 +101,6 @@ public class RequestVoteMessage implements Message {
 
         return new RequestVoteMessage(
                 term,
-                candidateId,
                 hostString,
                 port,
                 entry) ;

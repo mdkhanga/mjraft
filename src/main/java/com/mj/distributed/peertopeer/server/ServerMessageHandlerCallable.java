@@ -111,7 +111,8 @@ public class ServerMessageHandlerCallable implements Callable {
                 }
                 RequestVoteResponseMessage requestVoteResponseMessage = new RequestVoteResponseMessage(
                         message.getTerm(),
-                        message.getCandidateId(),
+                        message.getCandidateHost(),
+                        message.getCandidatePort(),
                         vote);
 
                 peerServer.queueSendMessage(socketChannel, requestVoteResponseMessage);
