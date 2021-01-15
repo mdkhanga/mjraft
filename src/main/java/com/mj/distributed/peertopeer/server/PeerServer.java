@@ -23,8 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class PeerServer implements NioListenerConsumer {
 
-    private int serverId ;
-
 
     private final ConcurrentMap<Member, Peer> connectedMembersMap = new ConcurrentHashMap<>() ;
     private volatile ConcurrentMap<Member, PeerData> memberPeerDataMap = new ConcurrentHashMap<>() ;
@@ -123,9 +121,7 @@ public class PeerServer implements NioListenerConsumer {
         // serverId = new AtomicInteger(id) ;
 
         LOG.info("Starting server on port: " + port + " state: "+ state);
-        if (serverId > 0) {
-            LOG.info("ServerId is "+ serverId);
-        }
+
 
         raftState = state ;
         inBoundMessageCreator = new InBoundMessageCreator(this);
@@ -174,7 +170,7 @@ public class PeerServer implements NioListenerConsumer {
 
     public void stop() throws Exception {
 
-        LOG.info(serverId + ": is stopping") ;
+        LOG.info(getServerId() + ": is stopping") ;
         stop = true;
         listener.stop();
     }
@@ -194,13 +190,26 @@ public class PeerServer implements NioListenerConsumer {
         currentTerm.set(t);
     }
 
-    public int getLeaderId() {
-        return leaderId;
+
+    public String getLeaderId() {
+        if (leader != null) {
+            return leader.getHostString()+":"+leader.getPort();
+        } else {
+            return "";
+        }
     }
 
+    public void setLeader(String leaderId) {
+
+        String[] parts = leaderId.split(":") ;
+
+        leader = new Member(parts[0],Integer.parseInt(parts[1]));
+    }
+
+    /*
     public void setLeaderId(int s) {
         leaderId = s ;
-    }
+    } */
 
 
     public void setCurrentVotedTerm(int term) {
@@ -414,7 +423,7 @@ public class PeerServer implements NioListenerConsumer {
 
     public void droppedConnection(SocketChannel s) {
 
-        LOG.info(serverId + ": connection dropped") ;
+        LOG.info(" connection dropped") ;
 
         removePeer(s);
 
@@ -514,7 +523,7 @@ public class PeerServer implements NioListenerConsumer {
                                     (System.currentTimeMillis() - currentVoteTimeStamp > LeaderElection.ELECTION_TIMEOUT)) {
 
 
-                                LOG.info(serverId + ": Starting leader election");
+                                LOG.info(getServerId() + ": Starting leader election");
                                 leaderElection = new LeaderElection(peerServer);
                                 peerServerExecutor.submit(leaderElection);
                             }
@@ -534,7 +543,7 @@ public class PeerServer implements NioListenerConsumer {
                         if ((peerServer.getlastLeaderHeartBeatts() > 0 && timeSinceLastLeadetBeat > randomDelay)
                                 &&
                                 (System.currentTimeMillis() - currentVoteTimeStamp > LeaderElection.ELECTION_TIMEOUT)) {
-                            LOG.info(serverId+ ":We need a leader Election. No heartBeat in ") ;
+                            LOG.info(getServerId() + ":We need a leader Election. No heartBeat in ") ;
                             raftState = RaftState.candidate;
                         }
 
@@ -557,7 +566,7 @@ public class PeerServer implements NioListenerConsumer {
         Member m = peer.member();
         PeerData v = memberPeerDataMap.get(m);
 
-        AppendEntriesMessage p = new AppendEntriesMessage(getTerm(),serverId,
+        AppendEntriesMessage p = new AppendEntriesMessage(getTerm(), getServerId(),
                 v.getNextSeq(),
                 rlog.size()-1,
                 lastComittedIndex.get());
@@ -607,7 +616,7 @@ public class PeerServer implements NioListenerConsumer {
 
     public void removePeer(SocketChannel sc) {
 
-        LOG.info(serverId + ": removed peer for dropped connection");
+        LOG.info(getServerId() + ": removed peer for dropped connection");
 
         Peer p = socketChannelPeerMap.get(sc) ;
 

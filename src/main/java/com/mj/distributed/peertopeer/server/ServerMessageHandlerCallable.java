@@ -48,6 +48,14 @@ public class ServerMessageHandlerCallable implements Callable {
                 peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
                 LOG.info(peerServer.getServerId()+"Registered peer " + message.getHostString() + ":" + message.getHostPort());
 
+                /* if (newMember && peerServer is not leader && noElection in progress) {
+
+                    respond with redirect message ;
+                } else if (newMember && electionin progress) {
+
+                    respond with status message election in progress
+                } */
+
             } else if(messageType == MessageType.TestClientHello.value()) {
 
                 LOG.info(peerServer.getServerId()+":Received a TestClient hello message");
@@ -121,10 +129,10 @@ public class ServerMessageHandlerCallable implements Callable {
                 AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
                 PeerData d = peerServer.getPeerData(socketChannel);
 
-                if ( message.getLeaderId() != peerServer.getLeaderId() ||
+                if ( message.getLeaderId().equals(peerServer.getLeaderId()) ||
                         message.getTerm() != peerServer.getTerm()) {
                     LOG.info(peerServer.getServerId()+ ":We have a new leader :" + message.getLeaderId());
-                    peerServer.setLeaderId(message.getLeaderId());
+                    peerServer.setLeader(message.getLeaderId());
                     peerServer.currentTerm.set(message.getTerm());
                     if (peerServer.isElectionInProgress()) {
                         peerServer.clearElectionInProgress();

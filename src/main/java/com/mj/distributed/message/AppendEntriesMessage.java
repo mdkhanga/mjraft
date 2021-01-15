@@ -14,7 +14,7 @@ public class AppendEntriesMessage implements Message {
 
     private static MessageType messageType = MessageType.AppendEntries;
 
-    private int leaderId = 1;
+    private String leaderId ;
 
     private int term = 0 ;
     private List<LogEntry> entries = new ArrayList<>();
@@ -28,12 +28,12 @@ public class AppendEntriesMessage implements Message {
 
     private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesMessage.class);
 
-    public AppendEntriesMessage(int leaderId, int seqId) {
+    public AppendEntriesMessage(String leaderId, int seqId) {
         this.leaderId = leaderId;
         this.seqId = seqId;
     }
 
-    public AppendEntriesMessage(int term, int leaderId, int seqId, int prevIndex, int leaderCommitIndex) {
+    public AppendEntriesMessage(int term, String leaderId, int seqId, int prevIndex, int leaderCommitIndex) {
 
         this.term = term;
         this.leaderId = leaderId;
@@ -58,7 +58,7 @@ public class AppendEntriesMessage implements Message {
         return term;
     }
 
-    public int getLeaderId() {
+    public String getLeaderId() {
         return leaderId;
     }
 
@@ -85,7 +85,11 @@ public class AppendEntriesMessage implements Message {
 
         d.writeInt(messageType.value());
         d.writeInt(term);
-        d.writeInt(leaderId);
+
+        // d.writeInt(leaderId);
+        byte[] leaderBytes = leaderId.getBytes("UTF-8");
+        d.writeInt(leaderBytes.length);
+        d.write(leaderBytes);
         d.writeInt(seqId);
         d.writeInt(prevIndex);
         d.writeInt(leaderCommitIndex);
@@ -124,7 +128,11 @@ public class AppendEntriesMessage implements Message {
         }
 
         int term = b.getInt();
-        int leaderId = b.getInt();
+        // int leaderId = b.getInt();
+        int leaderSize = b.getInt();
+        byte[] leaderBytes = new byte[leaderSize];
+        b.get(leaderBytes, 0, leaderSize);
+        String leaderId = new String(leaderBytes);
         int seqId = b.getInt();
         int prevIndex = b.getInt();
         int leaderCommitIndex = b.getInt();

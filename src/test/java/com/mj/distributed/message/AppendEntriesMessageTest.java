@@ -11,7 +11,7 @@ public class AppendEntriesMessageTest {
     @Test
     public void serialize() throws Exception {
 
-        AppendEntriesMessage msg = new AppendEntriesMessage(1,1);
+        AppendEntriesMessage msg = new AppendEntriesMessage("localhost:5001",1);
         LogEntry e = new LogEntry(0,4);
 
         msg.addLogEntry(e);
