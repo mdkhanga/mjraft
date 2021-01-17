@@ -129,7 +129,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
                 PeerData d = peerServer.getPeerData(socketChannel);
 
-                if ( message.getLeaderId().equals(peerServer.getLeaderId()) ||
+                if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||
                         message.getTerm() != peerServer.getTerm()) {
                     LOG.info(peerServer.getServerId()+ ":We have a new leader :" + message.getLeaderId());
                     peerServer.setLeader(message.getLeaderId());
@@ -171,6 +171,18 @@ public class ServerMessageHandlerCallable implements Callable {
 
                 LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
                 peerServer.addRaftClient(socketChannel);
+
+                if (peerServer.isElectionInProgress()) {
+                    LOG.info(peerServer.getServerId()+":Election in progress return error") ;
+                    peerServer.queueSendMessage(socketChannel,
+                            new ErrorResponse(1, "Election in progress. Please wait."));
+
+
+                    return null ;
+                }
+
+
+
                 peerServer.queueSendMessage(socketChannel, new RaftClientHelloResponse());
 
             } else if (messageType == MessageType.RaftClientAppendEntry.value()) {

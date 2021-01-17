@@ -30,7 +30,7 @@ public class RaftClient implements NioCallerConsumer {
         this.port = port;
     }
 
-    public void connect() throws Exception {
+    public int connect() throws Exception {
 
         nioCaller = new NioCaller(hostString, port, "raftclient",-1,this);
         nioCaller.start();
@@ -46,8 +46,17 @@ public class RaftClient implements NioCallerConsumer {
 
             }
 
-            RaftClientHelloResponse r = (RaftClientHelloResponse) response ;
-            response = null ;
+            if (response instanceof RaftClientHelloResponse) {
+                RaftClientHelloResponse r = (RaftClientHelloResponse) response ;
+                response = null ;
+                return 0 ;
+            } else if (response instanceof ErrorResponse) {
+                ErrorResponse r = (ErrorResponse) response ;
+                response = null ;
+                return r.getErrorCode() ;
+            } else {
+                throw new RuntimeException("Response to Hello not understood");
+            }
         }
 
 
@@ -109,6 +118,9 @@ public class RaftClient implements NioCallerConsumer {
                     messageWaitingResponse.notify();
                 } else if (messageType == MessageType.GetServerLogResponse.value()) {
                     response = GetServerLogResponse.deserialize(b.rewind());
+                    messageWaitingResponse.notify();
+                } else if (messageType == MessageType.Error.value()) {
+                    response = ErrorResponse.deserialize(b.rewind());
                     messageWaitingResponse.notify();
                 } else  {
                     throw new RuntimeException("RaftClient received unknown message");

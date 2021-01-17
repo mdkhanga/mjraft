@@ -9,27 +9,36 @@ import java.nio.ByteBuffer;
 
 public class ErrorResponse implements Message {
 
-    private MessageType messageType = MessageType.Hello ;
-    private String greeting = "Hello" ;
-    private String hostString ;
-    private int hostPort ;
+    private MessageType messageType = MessageType.Error ;
+    private int errorCode;
+    private String errorMessage;
+    private byte[] errorDetails;
 
     private static Logger LOG  = LoggerFactory.getLogger(ErrorResponse.class) ;
 
-    public ErrorResponse(String host, int port) {
+    public ErrorResponse(int code, String msg, byte[] details) {
 
-        this.hostString = host ;
-        this.hostPort = port ;
+        this.errorCode = code;
+        this.errorMessage = msg;
+        this.errorDetails = details;
 
     }
 
-    public String getHostString() {
-        return hostString ;
+    public ErrorResponse(int code, String msg) {
+
+        this.errorCode = code;
+        this.errorMessage = msg;
     }
 
-    public int getHostPort() {
-        return hostPort ;
+    public int getErrorCode() {
+        return errorCode;
     }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public byte[] getErrorDetails() { return errorDetails; }
 
 
     /**
@@ -39,27 +48,28 @@ public class ErrorResponse implements Message {
      */
     public ByteBuffer serialize() throws Exception {
 
-        byte[] greetingBytes = greeting.getBytes("UTF-8") ;
-        byte[] hostStringBytes = hostString.getBytes("UTF-8") ;
-
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(b);
         d.writeInt(messageType.value());
-        d.writeInt(greetingBytes.length);
-        d.write(greetingBytes);
-        d.writeInt(hostStringBytes.length);
-        d.write(hostStringBytes);
-        d.writeInt(hostPort);
+        d.writeInt(errorCode);
 
-        byte[] helloMsgArray = b.toByteArray();
+        byte[] errMsgBytes = errorMessage.getBytes("UTF-8");
+        d.writeInt(errMsgBytes.length);
+        d.write(errMsgBytes);
 
-        ByteBuffer retBuffer = ByteBuffer.allocate(helloMsgArray.length+4);//
+        if (errorDetails != null) {
+            d.writeInt(errorDetails.length);
+            d.write(errorDetails);
+        } else {
+            d.writeInt(0);
+        }
 
-        int l = helloMsgArray.length+4 ;
-        // LOG.info("Hello msg length " + l);
+        byte[] errMsgArray = b.toByteArray();
 
-        retBuffer.putInt(helloMsgArray.length);
-        retBuffer.put(helloMsgArray);
+        ByteBuffer retBuffer = ByteBuffer.allocate(errMsgArray.length+4);//
+
+        retBuffer.putInt(errMsgArray.length);
+        retBuffer.put(errMsgArray);
 
         retBuffer.flip() ; // make it ready for reading
 
@@ -71,28 +81,25 @@ public class ErrorResponse implements Message {
         int messagesize = readBuffer.getInt() ;
         // LOG.info("Received message of size " + messagesize) ;
         int messageType = readBuffer.getInt() ;
-        if (messageType != 1) {
-
-            throw new RuntimeException("Message is not the expected type HelloMessage") ;
+        if (messageType != MessageType.Error.value()) {
+            throw new RuntimeException("Message is not the expected type ErrorResponse") ;
         }
 
-        // LOG.info("Received a hello message") ;
-        int greetingSize = readBuffer.getInt() ;
-        byte[] greetingBytes = new byte[greetingSize] ;
-        readBuffer.get(greetingBytes,0,greetingSize) ;
-        // LOG.info("text greeing "+new String(greetingBytes)) ;
+        int code = readBuffer.getInt();
+        int messageSize = readBuffer.getInt();
+        byte[] messageBytes = new byte[messageSize];
+        readBuffer.get(messageBytes, 0, messageSize);
+        String message = new String(messageBytes);
 
+        int detailsSize = readBuffer.getInt();
 
-        int hostStringSize = readBuffer.getInt() ;
-        byte[] hostStringBytes = new byte[hostStringSize] ;
-        readBuffer.get(hostStringBytes,0,hostStringSize) ;
-        String hostString = new String(hostStringBytes) ;
-        // LOG.info("from host "+hostString) ;
-
-        int port = readBuffer.getInt() ;
-        // LOG.info("and port "+port) ;
-
-        return new ErrorResponse(hostString,port) ;
+        if (detailsSize > 0 ) {
+            byte[] details = new byte[detailsSize];
+            readBuffer.get(details, 0, detailsSize);
+            return new ErrorResponse(code, message, details);
+        } else {
+            return new ErrorResponse(code,  message);
+        }
     }
 
 }
