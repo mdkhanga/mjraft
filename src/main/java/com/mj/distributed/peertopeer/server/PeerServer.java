@@ -204,6 +204,11 @@ public class PeerServer implements NioListenerConsumer {
         String[] parts = leaderId.split(":") ;
 
         leader = new Member(parts[0],Integer.parseInt(parts[1]));
+
+        if (raftState == RaftState.leader || raftState == RaftState.candidate) {
+            LOG.info(getServerId() + " Change state from leader to follower. New leader is  "+ leaderId);
+
+        }
     }
 
     /*
@@ -272,11 +277,15 @@ public class PeerServer implements NioListenerConsumer {
     public void setElectionInProgress(int term) {
         electionInProgress = true;
         currentElectionTerm = term ;
+        currentElectionTerm = term;
     }
 
     public void clearElectionInProgress() {
         electionInProgress = false;
-        leaderElection.stop() ;
+        currentVotedTerm = -1 ;
+        if (leaderElection != null) {
+            leaderElection.stop();
+        }
     }
 
     public int getCurrentElectionTerm() {
@@ -523,6 +532,7 @@ public class PeerServer implements NioListenerConsumer {
                                     (System.currentTimeMillis() - currentVoteTimeStamp > LeaderElection.ELECTION_TIMEOUT)) {
 
 
+                                setElectionInProgress(getNextElectionTerm());
                                 LOG.info(getServerId() + ": Starting leader election");
                                 leaderElection = new LeaderElection(peerServer);
                                 peerServerExecutor.submit(leaderElection);

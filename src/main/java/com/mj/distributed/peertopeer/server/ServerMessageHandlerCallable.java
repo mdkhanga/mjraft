@@ -95,25 +95,27 @@ public class ServerMessageHandlerCallable implements Callable {
 
                 boolean vote ;
 
-                /* if (peerServer.isElectionInProgress() && requestVoteTerm <= peerServer.getCurrentElectionTerm()) {
+                if (peerServer.isElectionInProgress() && requestVoteTerm <= peerServer.getCurrentElectionTerm()) {
                     vote = false ;
                     LOG.info(peerServer.getServerId() + ": voted No because term < current " +
-                            "election term "+peerServer.getCurrentElectionTerm());
+                            " request vote term =" + requestVoteTerm +
+                            " election term="+peerServer.getCurrentElectionTerm());
                 }
-                else */ if (requestVoteTerm <= peerServer.getTerm()) {
+                else if (requestVoteTerm <= peerServer.getTerm()) {
                     vote = false;
                     LOG.info(peerServer.getServerId() + ": voted No because term < current term "+peerServer.getTerm());
-                } else if (peerServer.getRaftState() == RaftState.candidate &&
+                } /* else if (peerServer.getRaftState() == RaftState.candidate &&
                         requestVoteTerm <= peerServer.getTerm()+1 ) {
                     vote = false;
                     LOG.info(peerServer.getServerId() + ": voted No because we are candidate");
-                }
+                } */
                 else if (requestVoteTerm <= peerServer.getCurrentVotedTerm()) {
                     vote = false ;
                     LOG.info(peerServer.getServerId() + ": voted No because term < voted term "+peerServer.getCurrentVotedTerm());
                 } else {
 
-                    peerServer.setCurrentVotedTerm(message.getTerm());
+                    peerServer.setElectionInProgress(message.getTerm());
+                    // peerServer.setCurrentVotedTerm(message.getTerm());
                     LOG.info(peerServer.getServerId() + ": voted Yes");
                     vote = true ;
                 }
@@ -130,7 +132,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 PeerData d = peerServer.getPeerData(socketChannel);
 
                 if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||
-                        message.getTerm() != peerServer.getTerm()) {
+                        message.getTerm() > peerServer.getTerm()) {
                     LOG.info(peerServer.getServerId()+ ":We have a new leader :" + message.getLeaderId());
                     peerServer.setLeader(message.getLeaderId());
                     peerServer.currentTerm.set(message.getTerm());

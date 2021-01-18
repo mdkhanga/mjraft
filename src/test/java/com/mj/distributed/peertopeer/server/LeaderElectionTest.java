@@ -82,7 +82,15 @@ public class LeaderElectionTest {
 
 
         leader.stop();
-        Thread.sleep(35000);
+
+        /* Thread.sleep(3000) ;
+
+        RaftClient rs = new RaftClient("localhost", 6002);
+        int ret = rs.connect() ;
+        assertEquals(1, ret); */
+
+
+        Thread.sleep(32000);
 
         // check for new leader
         cs1 = ts2.getClusterInfo() ;

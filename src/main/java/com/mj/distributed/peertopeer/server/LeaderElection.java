@@ -32,19 +32,20 @@ public class LeaderElection implements Runnable {
         // int numServers = p.getClusterInfo().getMembers().size() - 1;
         members = p.getMembers();
         requiredVotes = Utils.majority(members.size()) ;
+        newterm = p.getCurrentElectionTerm();
     }
 
     public static int ELECTION_TIMEOUT = 5000; // ms
 
     public void run()  {
 
-        if (server.isElectionInProgress()) {
+        /* if (server.isElectionInProgress()) {
             LOG.info(server.getServerId()+ ":Election already in progress") ;
             return;
         } else {
             newterm = server.getNextElectionTerm();
             server.setElectionInProgress(newterm);
-        }
+        } */
 
         // start election timer
         electionStartTime = System.currentTimeMillis() ;
