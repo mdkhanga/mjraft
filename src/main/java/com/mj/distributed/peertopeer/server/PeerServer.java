@@ -300,6 +300,14 @@ public class PeerServer implements NioListenerConsumer {
         return electionInProgress;
     }
 
+    public boolean isLeader() {
+        return leader.equals(thisMember);
+    }
+
+    public Member getLeader() {
+        return leader;
+    }
+
     public void queueSendMessage(SocketChannel c, Message m) throws Exception {
 
         Peer p = socketChannelPeerMap.get(c) ;

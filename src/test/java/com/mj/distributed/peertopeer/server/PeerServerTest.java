@@ -52,7 +52,7 @@ public class PeerServerTest {
     }
 
     @Test
-    public void logReplication() throws Exception {
+    public void     logReplication() throws Exception {
 
 
         List<Integer> inputs = Arrays.asList(23,33,44,91,66);
@@ -80,7 +80,7 @@ public class PeerServerTest {
         List<Integer> server3Ints = convertToIntList(server3Values) ;
 
         // TestClient ts0 = new TestClient("localhost",5001);
-        RaftClient ts0 = new RaftClient("localhost",5001);
+        RaftClient ts0 = new RaftClient("localhost",5002);
         ts0.connect();
         List<byte[]> server0Values = ts0.get(0,5);
         List<Integer> server0Ints = convertToIntList(server0Values) ;

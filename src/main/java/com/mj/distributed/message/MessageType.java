@@ -17,7 +17,9 @@ public enum MessageType {
     GetClusterInfo(15),
     TestClientHelloResponse(16),
     RaftClientHelloResponse(17),
-    Error(18);
+    Error(18),
+    Response(19),
+    ;
 
     private int value ;
 

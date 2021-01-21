@@ -1,15 +1,16 @@
 package com.mj.raft.client;
 
 import com.mj.distributed.message.*;
+import com.mj.distributed.model.Error;
+import com.mj.distributed.model.Redirect;
 import com.mj.distributed.tcp.nio.NioCaller;
 import com.mj.distributed.tcp.nio.NioCallerConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Console;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,35 +33,67 @@ public class RaftClient implements NioCallerConsumer {
 
     public int connect() throws Exception {
 
-        nioCaller = new NioCaller(hostString, port, "raftclient",-1,this);
+        boolean connectedOrError = false;
+
+        String hostToTry = hostString ;
+        int portToTry = port;
+
+        while (!connectedOrError) {
+
+            Response r = _connect(hostToTry, portToTry);
+
+            if (r.getStatus() == 0) {
+                connectedOrError = true;
+                return 0;
+            } else if (r.getStatus() == 0 && r.getType() == 1) {
+                        // redirect
+                Redirect rd = Redirect.fromBytes(r.getDetails()) ;
+                nioCaller.stop();
+                hostToTry = rd.getHost();
+                portToTry = rd.getHostPort();
+            } else {
+                connectedOrError = true;
+                return r.getStatus();
+            }
+
+        }
+
+        return -1;
+    }
+
+    Response _connect(String host, int port) throws Exception {
+
+        nioCaller = new NioCaller(host, port, "raftclient", -1, this);
         nioCaller.start();
         RaftClientHello hello = new RaftClientHello();
-        messageWaitingResponse = 0 ;
+        messageWaitingResponse = 0;
         nioCaller.queueSendMessage(hello.serialize());
 
         synchronized (messageWaitingResponse) {
 
-            while(response == null ) {
+            while (response == null) {
 
                 messageWaitingResponse.wait();
 
             }
 
-            if (response instanceof RaftClientHelloResponse) {
-                RaftClientHelloResponse r = (RaftClientHelloResponse) response ;
-                response = null ;
-                return 0 ;
-            } else if (response instanceof ErrorResponse) {
-                ErrorResponse r = (ErrorResponse) response ;
-                response = null ;
-                return r.getErrorCode() ;
+            if (response instanceof Response) {
+                Response r = (Response) response;
+                response = null;
+
+                return r;
+
             } else {
                 throw new RuntimeException("Response to Hello not understood");
             }
         }
 
 
+
+
+
     }
+
 
     public void close() throws Exception {
         nioCaller.stop();
@@ -113,14 +146,16 @@ public class RaftClient implements NioCallerConsumer {
                 int messageSize = b.getInt();
                 int messageType = b.getInt() ;
 
+                LOG.info("Raft client Received a response messageType "+ messageType);
+
                 if (messageType == MessageType.RaftClientHelloResponse.value()) {
                     response = RaftClientHelloResponse.deserialize(b.rewind());
                     messageWaitingResponse.notify();
                 } else if (messageType == MessageType.GetServerLogResponse.value()) {
                     response = GetServerLogResponse.deserialize(b.rewind());
                     messageWaitingResponse.notify();
-                } else if (messageType == MessageType.Error.value()) {
-                    response = ErrorResponse.deserialize(b.rewind());
+                } else if (messageType == MessageType.Response.value()) {
+                    response = Response.deserialize(b.rewind());
                     messageWaitingResponse.notify();
                 } else  {
                     throw new RuntimeException("RaftClient received unknown message");

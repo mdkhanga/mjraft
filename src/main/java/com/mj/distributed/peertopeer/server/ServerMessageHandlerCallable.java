@@ -1,8 +1,10 @@
 package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.message.*;
+import com.mj.distributed.model.Error;
 import com.mj.distributed.model.LogEntry;
-import com.mj.distributed.model.RaftState;
+import com.mj.distributed.model.Member;
+import com.mj.distributed.model.Redirect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,16 +178,24 @@ public class ServerMessageHandlerCallable implements Callable {
 
                 if (peerServer.isElectionInProgress()) {
                     LOG.info(peerServer.getServerId()+":Election in progress return error") ;
+                    Error e = new Error(1, "Election in progress. Please wait.") ;
                     peerServer.queueSendMessage(socketChannel,
-                            new ErrorResponse(1, "Election in progress. Please wait."));
+                            new Response(0, 1, e.toBytes()));
 
 
-                    return null ;
+                } else if (!peerServer.isLeader()) {
+
+                    Member leader = peerServer.getLeader();
+                    LOG.info(peerServer.getServerId()+":Redirecting to leader "+leader.getHostString() + ":" + leader.getPort()) ;
+                    Redirect r = new Redirect(leader.getHostString(), leader.getPort());
+                    peerServer.queueSendMessage(socketChannel,
+                            new Response(0, 1, r.toBytes()));
+
+                } else {
+
+                    // all good
+                    peerServer.queueSendMessage(socketChannel, new Response(1,0));
                 }
-
-
-
-                peerServer.queueSendMessage(socketChannel, new RaftClientHelloResponse());
 
             } else if (messageType == MessageType.RaftClientAppendEntry.value()) {
 
