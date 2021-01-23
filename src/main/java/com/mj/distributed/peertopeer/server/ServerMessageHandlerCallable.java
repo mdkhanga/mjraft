@@ -47,18 +47,25 @@ public class ServerMessageHandlerCallable implements Callable {
 
                // LOG.info(peerServer.getServerId()+ ":Received a hello message");
                 HelloMessage message = HelloMessage.deserialize(readBuffer.rewind());
+                peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
+                LOG.info(peerServer.getServerId()+"Registered peer " + message.getHostString() + ":" + message.getHostPort());
 
                 if (peerServer.isElectionInProgress()) {
 
+                    LOG.info(peerServer.getServerId()+":Election in progress return error") ;
+                    Error e = new Error(1, "Election in progress. Please wait.") ;
+                    peerServer.queueSendMessage(socketChannel,
+                            new Response(0, 1, e.toBytes()));
 
                 } else if (!peerServer.isLeader()) {
 
+                    Member leader = peerServer.getLeader();
+                    LOG.info(peerServer.getServerId()+":Redirecting to leader "+leader.getHostString() + ":" + leader.getPort()) ;
+                    Redirect r = new Redirect(leader.getHostString(), leader.getPort());
+                    peerServer.queueSendMessage(socketChannel,
+                            new Response(0, 1, r.toBytes()));
 
-
-                } else {
-                    peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
-                    LOG.info(peerServer.getServerId()+"Registered peer " + message.getHostString() + ":" + message.getHostPort());
-                }
+                } 
 
 
            } else if(messageType == MessageType.TestClientHello.value()) {
