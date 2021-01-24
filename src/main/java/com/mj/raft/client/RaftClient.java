@@ -42,10 +42,10 @@ public class RaftClient implements NioCallerConsumer {
 
             Response r = _connect(hostToTry, portToTry);
 
-            if (r.getStatus() == 0) {
+            if (r.getStatus() == 0 && r.getType() == 1) {
                 connectedOrError = true;
                 return 0;
-            } else if (r.getStatus() == 0 && r.getType() == 1) {
+            } else if (r.getStatus() == 0 && r.getType() == 2) {
                         // redirect
                 Redirect rd = Redirect.fromBytes(r.getDetails()) ;
                 nioCaller.stop();

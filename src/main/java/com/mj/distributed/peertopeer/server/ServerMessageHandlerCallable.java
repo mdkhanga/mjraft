@@ -45,27 +45,45 @@ public class ServerMessageHandlerCallable implements Callable {
 
             if (messageType == MessageType.Hello.value()) {
 
-               // LOG.info(peerServer.getServerId()+ ":Received a hello message");
+                // LOG.info(peerServer.getServerId()+ ":Received a hello message");
                 HelloMessage message = HelloMessage.deserialize(readBuffer.rewind());
                 peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
-                LOG.info(peerServer.getServerId()+"Registered peer " + message.getHostString() + ":" + message.getHostPort());
+                LOG.info(peerServer.getServerId() + "Registered peer " + message.getHostString() + ":" + message.getHostPort());
 
                 if (peerServer.isElectionInProgress()) {
 
-                    LOG.info(peerServer.getServerId()+":Election in progress return error") ;
-                    Error e = new Error(1, "Election in progress. Please wait.") ;
+                    LOG.info(peerServer.getServerId() + ":Election in progress return error");
+                    Error e = new Error(1, "Election in progress. Please wait.");
                     peerServer.queueSendMessage(socketChannel,
                             new Response(0, 1, e.toBytes()));
 
                 } else if (!peerServer.isLeader()) {
 
                     Member leader = peerServer.getLeader();
-                    LOG.info(peerServer.getServerId()+":Redirecting to leader "+leader.getHostString() + ":" + leader.getPort()) ;
+                    LOG.info(peerServer.getServerId() + ":Redirecting to leader " + leader.getHostString() + ":" + leader.getPort());
                     Redirect r = new Redirect(leader.getHostString(), leader.getPort());
                     peerServer.queueSendMessage(socketChannel,
-                            new Response(0, 1, r.toBytes()));
+                            new Response(0, 2, r.toBytes()));
 
-                } 
+                }
+
+            } else if (messageType == MessageType.Response.value()) {
+
+                Response r = Response.deserialize(readBuffer.rewind()) ;
+                if (r.getStatus() == 0 && r.getType() == 1) {
+
+                    LOG.info("Election in progress. Trying again") ;
+                    // peerServer.stop() ;
+                    // TODO add delay
+                    HelloMessage m = new HelloMessage(peerServer.getBindHost(),
+                                        peerServer.getBindPort());
+                    peerServer.queueSendMessage(socketChannel, m);
+                } else if (r.getStatus() == 0 && r.getType() == 2 ) {
+
+                    Redirect rd = Redirect.fromBytes(r.getDetails()) ;
+                    peerServer.redirect(socketChannel, rd);
+
+                }
 
 
            } else if(messageType == MessageType.TestClientHello.value()) {
@@ -199,7 +217,7 @@ public class ServerMessageHandlerCallable implements Callable {
                     LOG.info(peerServer.getServerId()+":Redirecting to leader "+leader.getHostString() + ":" + leader.getPort()) ;
                     Redirect r = new Redirect(leader.getHostString(), leader.getPort());
                     peerServer.queueSendMessage(socketChannel,
-                            new Response(0, 1, r.toBytes()));
+                            new Response(0, 2, r.toBytes()));
 
                 } else {
 

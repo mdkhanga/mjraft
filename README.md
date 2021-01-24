@@ -7,6 +7,7 @@ This is work in progress.
 - Leader election
 - Client API to submit log entries
 - Embeddable into your distributed application
+- Redirect to leader from follower/candidate
 
 ## Usage
 
@@ -31,7 +32,7 @@ leader.start() ;
 
 ```
 String[] seeds = new String[1];
-seeds[0] = "localhost:5001";
+seeds[0] = "localhost:5001"; // can connect to any server
 
 PeerServer server1 = new PeerServer(5002, seeds);
 server1.start();
@@ -45,7 +46,7 @@ server2.start();
 #### Send log entries to the leader
 
 ```
-RaftClient raftClient = new RaftClient("localhost", 5001);
+RaftClient raftClient = new RaftClient("localhost", 5001); // can connect to any server
 raftClient.connect();
 raftClient.send(23);
 ```

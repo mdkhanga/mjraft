@@ -1,15 +1,12 @@
 package com.mj.distributed.peertopeer.server;
 
+import com.mj.distributed.model.*;
 import com.mj.distributed.tcp.nio.NioListener;
 import com.mj.distributed.tcp.nio.NioListenerConsumer;
 import com.mj.distributed.message.AppendEntriesMessage;
 import com.mj.distributed.message.ClusterInfoMessage;
 import com.mj.distributed.message.HelloMessage;
-import com.mj.distributed.model.LogEntry;
 import com.mj.distributed.message.Message;
-import com.mj.distributed.model.ClusterInfo;
-import com.mj.distributed.model.Member;
-import com.mj.distributed.model.RaftState;
 import com.mj.distributed.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,24 +93,6 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    /* public PeerServer( int port, String[] s, RaftState state) {
-
-        seeds = s;
-        // serverId = new AtomicInteger(id) ;
-        if (s == null || s.length == 0) {
-            serverId = serverIdGenerator.incrementAndGet() ;
-        }
-
-        _peerServer( port, state);
-
-    } */
-
-    /* public PeerServer(int port, RaftState state) {
-
-        // serverId = new AtomicInteger(id) ;
-        _peerServer(port, state);
-
-    } */
 
     public void _peerServer( int port, RaftState state) {
 
@@ -628,6 +607,20 @@ public class PeerServer implements NioListenerConsumer {
         }
         ClusterInfoMessage cm = new ClusterInfoMessage(info);
         peer.queueSendMessage(cm);
+
+    }
+
+    public void redirect(SocketChannel sc, Redirect r) throws Exception {
+
+        LOG.info("redirecting to "+r.getHost() + ":" +r.getHostPort());
+        // keep the current connection around
+        // As it could be used later start a new connection
+        LOG.info("Connecting to") ;
+        PeerClient peer = new PeerClient(r.getHost(), r.getHostPort(),this);
+        peer.start();
+        HelloMessage m = new HelloMessage(getBindHost(),getBindPort());
+        peer.queueSendMessage(m.serialize());
+        LOG.info("Done write hello to q") ;
 
     }
 

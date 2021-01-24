@@ -48,7 +48,7 @@ class RaftClientTest {
 
         int ret = rc.connect() ;
 
-        assert(0 == ret) ;
+        assert(1 == ret) ;
 
     }
 
@@ -71,7 +71,7 @@ class RaftClientTest {
         Response r = rc._connect("localhost",8003) ;
 
         assertEquals(0, r.getStatus());
-        assertEquals(1, r.getType());
+        assertEquals(2, r.getType());
 
     }
 }
