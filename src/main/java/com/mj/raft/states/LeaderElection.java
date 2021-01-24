@@ -1,10 +1,11 @@
-package com.mj.distributed.peertopeer.server;
+package com.mj.raft.states;
 
-import com.mj.distributed.message.HelloMessage;
 import com.mj.distributed.message.RequestVoteMessage;
 import com.mj.distributed.message.RequestVoteResponseMessage;
 import com.mj.distributed.model.Member;
 import com.mj.distributed.model.RaftState;
+import com.mj.distributed.peertopeer.server.Peer;
+import com.mj.distributed.peertopeer.server.PeerServer;
 import com.mj.distributed.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,7 @@ public class LeaderElection implements Runnable {
 
     private volatile boolean stop = false;
 
-    LeaderElection(PeerServer p) {
+    public LeaderElection(PeerServer p) {
         server = p ;
         // int numServers = p.getClusterInfo().getMembers().size() - 1;
         members = p.getMembers();
