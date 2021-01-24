@@ -8,7 +8,7 @@ import com.mj.distributed.message.ClusterInfoMessage;
 import com.mj.distributed.message.HelloMessage;
 import com.mj.distributed.message.Message;
 import com.mj.distributed.utils.Utils;
-import com.mj.raft.states.LeaderElection;
+import com.mj.raft.states.Candidate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +71,7 @@ public class PeerServer implements NioListenerConsumer {
     private volatile AtomicInteger serverIdGenerator = new AtomicInteger(1);
     private volatile boolean electionInProgress = false ;
     private volatile int currentElectionTerm = -1 ;
-    private volatile LeaderElection leaderElection ;
+    private volatile Candidate leaderElection ;
 
     private volatile int currentVotedTerm = -1;
     private volatile long currentVoteTimeStamp = 0;
@@ -517,12 +517,12 @@ public class PeerServer implements NioListenerConsumer {
                                     peerServer.getlastLeaderHeartBeatts();
                             if ((peerServer.getlastLeaderHeartBeatts() > 0 && timeSinceLastLeadetBeat > randomDelay)
                                     &&
-                                    (System.currentTimeMillis() - currentVoteTimeStamp > LeaderElection.ELECTION_TIMEOUT)) {
+                                    (System.currentTimeMillis() - currentVoteTimeStamp > Candidate.ELECTION_TIMEOUT)) {
 
 
                                 setElectionInProgress(getNextElectionTerm());
                                 LOG.info(getServerId() + ": Starting leader election");
-                                leaderElection = new LeaderElection(peerServer);
+                                leaderElection = new Candidate(peerServer);
                                 peerServerExecutor.submit(leaderElection);
                             }
 
@@ -540,7 +540,7 @@ public class PeerServer implements NioListenerConsumer {
                             peerServer.getlastLeaderHeartBeatts();
                         if ((peerServer.getlastLeaderHeartBeatts() > 0 && timeSinceLastLeadetBeat > randomDelay)
                                 &&
-                                (System.currentTimeMillis() - currentVoteTimeStamp > LeaderElection.ELECTION_TIMEOUT)) {
+                                (System.currentTimeMillis() - currentVoteTimeStamp > Candidate.ELECTION_TIMEOUT)) {
                             LOG.info(getServerId() + ":We need a leader Election. No heartBeat in ") ;
                             raftState = RaftState.candidate;
                         }

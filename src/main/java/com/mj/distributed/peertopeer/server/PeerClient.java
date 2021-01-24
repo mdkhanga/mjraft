@@ -4,7 +4,7 @@ import com.mj.distributed.tcp.nio.NioCaller;
 import com.mj.distributed.tcp.nio.NioCallerConsumer;
 import com.mj.distributed.model.LogEntry;
 import com.mj.distributed.model.Member;
-import com.mj.raft.states.LeaderElection;
+import com.mj.raft.states.Candidate;
 import org.slf4j.LoggerFactory ;
 import org.slf4j.Logger ;
 import java.io.DataOutputStream;
@@ -130,7 +130,7 @@ public class PeerClient implements NioCallerConsumer {
 
             boolean leaderElectionStarted = false ;
 
-            LeaderElection leaderElection = null ;
+            Candidate leaderElection = null ;
 
             while(true) {
 

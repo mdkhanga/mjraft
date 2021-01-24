@@ -13,12 +13,12 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class LeaderElection implements Runnable {
+public class Candidate implements Runnable {
 
     private PeerServer server;
 
     private long electionStartTime ;
-    private Logger LOG = LoggerFactory.getLogger(LeaderElection.class);
+    private Logger LOG = LoggerFactory.getLogger(Candidate.class);
     private int requiredVotes ;
     private volatile AtomicInteger noVotes = new AtomicInteger(0);
     volatile AtomicInteger currentVoteCount = new AtomicInteger(1);
@@ -28,7 +28,7 @@ public class LeaderElection implements Runnable {
 
     private volatile boolean stop = false;
 
-    public LeaderElection(PeerServer p) {
+    public Candidate(PeerServer p) {
         server = p ;
         // int numServers = p.getClusterInfo().getMembers().size() - 1;
         members = p.getMembers();
