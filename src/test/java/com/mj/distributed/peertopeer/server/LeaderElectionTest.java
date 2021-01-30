@@ -1,7 +1,6 @@
 package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.model.ClusterInfo;
-import com.mj.distributed.model.RaftState;
 import com.mj.raft.client.RaftClient;
 import com.mj.raft.test.client.TestClient;
 import org.junit.jupiter.api.AfterAll;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

@@ -1,8 +1,6 @@
 package com.mj.distributed.peertopeer.server;
 
-import com.mj.distributed.message.ClusterInfoMessage;
 import com.mj.distributed.model.ClusterInfo;
-import com.mj.distributed.model.RaftState;
 import com.mj.raft.client.RaftClient;
 import com.mj.raft.test.client.TestClient;
 

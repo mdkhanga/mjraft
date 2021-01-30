@@ -202,6 +202,10 @@ public class PeerServer implements NioListenerConsumer {
         currentVoteTimeStamp = System.currentTimeMillis();
     }
 
+    public long getCurrentVoteTimeStamp() {
+        return currentVoteTimeStamp;
+    }
+
     public int getCurrentVotedTerm() {
         return currentVotedTerm;
     }
@@ -714,6 +718,11 @@ public class PeerServer implements NioListenerConsumer {
         return p;
 
 
+    }
+
+    public List<Peer> getPeers() {
+
+        return new ArrayList(connectedMembersMap.values()) ;
 
     }
 

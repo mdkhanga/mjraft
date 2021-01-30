@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Candidate implements Runnable {
+public class Candidate implements State, Runnable {
 
     private PeerServer server;
 
@@ -150,8 +150,26 @@ public class Candidate implements Runnable {
 
     }
 
+    @Override
+    public RaftState raftState() {
+        return RaftState.candidate;
+    }
+
+    @Override
+    public void start() {
+
+    }
+
+    @Override
     public void stop() {
         stop = true ;
+    }
+
+    @Override
+    public void changeState(State newState) {
+        server.setRaftState(newState.raftState());
+        stop();
+        newState.start();
     }
 
     public int vote(boolean v) {
