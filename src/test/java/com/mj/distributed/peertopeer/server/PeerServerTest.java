@@ -50,7 +50,7 @@ public class PeerServerTest {
     }
 
     @Test
-    public void     logReplication() throws Exception {
+    public void logReplication() throws Exception {
 
 
         List<Integer> inputs = Arrays.asList(23,33,44,91,66);

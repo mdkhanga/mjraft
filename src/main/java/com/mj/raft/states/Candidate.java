@@ -33,20 +33,21 @@ public class Candidate implements State, Runnable {
         // int numServers = p.getClusterInfo().getMembers().size() - 1;
         members = p.getMembers();
         requiredVotes = Utils.majority(members.size()) ;
-        newterm = p.getCurrentElectionTerm();
+        // newterm = p.getCurrentElectionTerm();
+
     }
 
     public static int ELECTION_TIMEOUT = 5000; // ms
 
     public void run()  {
 
-        /* if (server.isElectionInProgress()) {
+        if (server.isElectionInProgress()) {
             LOG.info(server.getServerId()+ ":Election already in progress") ;
             return;
         } else {
             newterm = server.getNextElectionTerm();
-            server.setElectionInProgress(newterm);
-        } */
+            server.setElectionInProgress(newterm, this);
+        }
 
         // start election timer
         electionStartTime = System.currentTimeMillis() ;
@@ -106,7 +107,8 @@ public class Candidate implements State, Runnable {
             if (currentVoteCount.get() >= requiredVotes) {
 
                 LOG.info(server.getServerId()+":Won Election for term " + newterm + " with votes " + currentVoteCount.get()) ;
-                server.setRaftState(RaftState.leader);
+                // server.setRaftState(RaftState.leader);
+                changeState(new Leader(server));
                 server.setTerm(newterm);
                 server.clearElectionInProgress();
                 break;
@@ -114,7 +116,8 @@ public class Candidate implements State, Runnable {
 
             if (noVotes.get() >= requiredVotes) {
                 server.clearElectionInProgress();
-                server.setRaftState(RaftState.follower);
+                // server.setRaftState(RaftState.follower);
+                changeState(new Follower(server));
                 LOG.info(server.getServerId()+":Election vote NO  for term " + newterm) ;
                 break;
             }
@@ -122,7 +125,8 @@ public class Candidate implements State, Runnable {
             long currentTime = System.currentTimeMillis() ;
             if (currentTime - electionStartTime > ELECTION_TIMEOUT) {
                 server.clearElectionInProgress();
-                server.setRaftState(RaftState.follower);
+                // server.setRaftState(RaftState.follower);
+                changeState(new Follower(server));
                 LOG.info(server.getServerId()+":Election timed out for term " + newterm) ;
                 break ;
             }
@@ -135,18 +139,6 @@ public class Candidate implements State, Runnable {
         }
 
         LOG.info("Election over for term " + newterm) ;
-        // while( election not timed out && some else did not become leader)
-
-            // if (checkVoteCount > majority)
-
-                // done we
-
-                // become leader and start sending heartbeat
-
-
-                // exit
-
-
 
     }
 
@@ -157,11 +149,12 @@ public class Candidate implements State, Runnable {
 
     @Override
     public void start() {
-
+        server.startTask(this);
     }
 
     @Override
     public void stop() {
+        LOG.info(server.getServerId()+ " stopping leader election");
         stop = true ;
     }
 

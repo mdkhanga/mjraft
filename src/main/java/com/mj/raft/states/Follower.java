@@ -27,18 +27,26 @@ public class Follower implements State, Runnable {
                 Thread.sleep(200);
 
                 int randomDelay = Utils.getRandomDelay();
+                Thread.sleep(randomDelay);
                 // LOG.info("Got random Delay " + randomDelay);
 
                 long timeSinceLastLeadetBeat = System.currentTimeMillis() -
                         server.getlastLeaderHeartBeatts();
 
-                if ((server.getlastLeaderHeartBeatts() > 0 && timeSinceLastLeadetBeat > randomDelay)
+                if ((server.getlastLeaderHeartBeatts() > 0
                         &&
-                        (System.currentTimeMillis() - server.getCurrentVoteTimeStamp() > Candidate.ELECTION_TIMEOUT)) {
+                        timeSinceLastLeadetBeat > Candidate.ELECTION_TIMEOUT)) {
 
-                    LOG.info(server.getServerId() + ":We need a leader Election. No heartBeat in ");
+
+
+                    LOG.info(server.getServerId() + ":We need a leader Election. No heartBeat in " + timeSinceLastLeadetBeat);
+                    // Thread.sleep(randomDelay);
+                    LOG.info(server.getServerId() + "Try to start election after delay " + randomDelay);
+
                     // raftState = RaftStates.candidate;
-                    changeState(new Candidate(server));
+                    Candidate cd = new Candidate(server) ;
+                    changeState(cd);
+                    stop();
                 }
 
             } catch(Exception e) {
@@ -57,12 +65,12 @@ public class Follower implements State, Runnable {
 
     @Override
     public void start() {
-
+        server.startTask(this);
     }
 
     @Override
     public void stop() {
-
+        stop = true;
     }
 
     @Override

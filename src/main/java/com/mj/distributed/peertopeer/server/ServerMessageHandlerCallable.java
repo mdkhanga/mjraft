@@ -144,7 +144,7 @@ public class ServerMessageHandlerCallable implements Callable {
                     LOG.info(peerServer.getServerId() + ": voted No because term < voted term "+peerServer.getCurrentVotedTerm());
                 } else {
 
-                    peerServer.setElectionInProgress(message.getTerm());
+                    peerServer.setElectionInProgress(message.getTerm(), null);
                     // peerServer.setCurrentVotedTerm(message.getTerm());
                     LOG.info(peerServer.getServerId() + ": voted Yes");
                     vote = true ;
@@ -167,6 +167,7 @@ public class ServerMessageHandlerCallable implements Callable {
                     peerServer.setLeader(message.getLeaderId());
                     peerServer.currentTerm.set(message.getTerm());
                     if (peerServer.isElectionInProgress()) {
+                        LOG.info(peerServer.getServerId()+ " stopping leader election due to heartbeat from leader");
                         peerServer.clearElectionInProgress();
                     }
                 }

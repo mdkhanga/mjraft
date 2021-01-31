@@ -30,13 +30,14 @@ public class Leader implements State, Runnable {
 
             try {
 
-                Thread.sleep(200);
+                Thread.sleep(100);
 
                 List<Peer> connectedPeers = server.getPeers() ;
 
                 connectedPeers.forEach((v) -> {
 
                     try {
+
 
                         server.sendAppendEntriesMessage(v);
 
@@ -68,12 +69,12 @@ public class Leader implements State, Runnable {
 
     @Override
     public void start() {
-
+        server.startTask(this);
     }
 
     @Override
     public void stop() {
-
+        stop = true;
     }
 
     @Override
