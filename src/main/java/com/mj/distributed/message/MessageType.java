@@ -1,5 +1,11 @@
 package com.mj.distributed.message;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static java.util.stream.StreamSupport.stream;
+
 public enum MessageType {
     Hello(1),
     Ping(2),
@@ -18,10 +24,13 @@ public enum MessageType {
     TestClientHelloResponse(16),
     RaftClientHelloResponse(17),
     Error(18),
-    Response(19),
+    Response(19)
     ;
 
     private int value ;
+
+    private final static Map<Integer, MessageType> map =
+            Arrays.stream(MessageType.values()).collect(Collectors.toMap(t->t.value(), t->t));
 
     MessageType(int n) {
         value = n;
@@ -29,5 +38,9 @@ public enum MessageType {
 
     public int value() {
         return value;
+    }
+
+    public static MessageType valueOf(int v) {
+        return map.get(v);
     }
 }

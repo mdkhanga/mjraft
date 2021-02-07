@@ -1,6 +1,7 @@
 package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.message.*;
+import com.mj.distributed.message.handler.*;
 import com.mj.distributed.model.Error;
 import com.mj.distributed.model.LogEntry;
 import com.mj.distributed.model.Member;
@@ -10,7 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 public class ServerMessageHandlerCallable implements Callable {
@@ -20,6 +23,15 @@ public class ServerMessageHandlerCallable implements Callable {
     PeerServer peerServer;
 
     Logger LOG  = LoggerFactory.getLogger(ServerMessageHandlerCallable.class) ;
+
+    static Map<MessageType, MessageHandler> handlerMap = new HashMap<>() ;
+    static {
+        handlerMap.put(MessageType.Hello, new HelloHandler());
+        handlerMap.put(MessageType.Response, new ResponseHandler());
+        handlerMap.put(MessageType.TestClientHello, new TestHelloHandler());
+        handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesHelloHandler());
+        handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
+    }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
 
@@ -45,6 +57,10 @@ public class ServerMessageHandlerCallable implements Callable {
 
             if (messageType == MessageType.Hello.value()) {
 
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
+
+                /*
                 // LOG.info(peerServer.getServerId()+ ":Received a hello message");
                 HelloMessage message = HelloMessage.deserialize(readBuffer.rewind());
                 peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
@@ -65,11 +81,11 @@ public class ServerMessageHandlerCallable implements Callable {
                     peerServer.queueSendMessage(socketChannel,
                             new Response(0, 2, r.toBytes()));
 
-                }
+                } */
 
             } else if (messageType == MessageType.Response.value()) {
 
-                Response r = Response.deserialize(readBuffer.rewind()) ;
+                /* Response r = Response.deserialize(readBuffer.rewind()) ;
                 if (r.getStatus() == 0 && r.getType() == 1) {
 
                     LOG.info("Election in progress. Trying again") ;
@@ -83,22 +99,26 @@ public class ServerMessageHandlerCallable implements Callable {
                     Redirect rd = Redirect.fromBytes(r.getDetails()) ;
                     peerServer.redirect(socketChannel, rd);
 
-                }
-
+                } */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
 
            } else if(messageType == MessageType.TestClientHello.value()) {
 
-                LOG.info(peerServer.getServerId()+":Received a TestClient hello message");
+                /* LOG.info(peerServer.getServerId()+":Received a TestClient hello message");
                 peerServer.addRaftClient(socketChannel);
                 peerServer.queueSendMessage(socketChannel, new TestClientHelloResponse());
+                */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
 
             } else if (messageType == MessageType.Ack.value()) {
 
                 AckMessage message = AckMessage.deserialize(readBuffer.rewind());
 
                 // LOG.info("Received ack message from " + d.member().getHostString() + ":" + d.member().getPort() + " with seq " + message.getSeqOfMessageAcked());
-            } else if (messageType == 5) {
-                AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
+            } else if (messageType == MessageType.AppendEntriesResponse.value()) {
+                /* AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
                 PeerData d = peerServer.getPeerData(socketChannel);
                 int index = d.getIndexAcked(message.getSeqOfMessageAcked());
                 // LOG.info("Got AppendEntries response from" + d.getHostString() + "  " + d.getPort()) ;
@@ -107,13 +127,10 @@ public class ServerMessageHandlerCallable implements Callable {
                 if (index >= 0) {
                    // LOG.info("got index for seqId " + message.getSeqOfMessageAcked()) ;
                     peerServer.updateIndexAckCount(index);
-                } else {
-                    // LOG.info("Not updating ack count") ;
-                }
+                } */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
 
-                // LOG.info("Received an appendEntriesResponse message from " + d.getHostString() + ":" + d.getPort()
-                //
-                //+ " with seq " + message.getSeqOfMessageAcked());
             } else if (messageType == MessageType.RequestVote.value()) {
 
                 RequestVoteMessage message = RequestVoteMessage.deserialize(readBuffer.rewind());
@@ -158,7 +175,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 peerServer.queueSendMessage(socketChannel, requestVoteResponseMessage);
 
             } else if (messageType == MessageType.AppendEntries.value()) {
-                AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
+               /* AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
                 PeerData d = peerServer.getPeerData(socketChannel);
 
                 if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||
@@ -180,7 +197,9 @@ public class ServerMessageHandlerCallable implements Callable {
                 entryResult = peerServer.processLogEntry(e,message.getPrevIndex(),message.getLeaderCommitIndex()) ;
                 AppendEntriesResponse resp = new AppendEntriesResponse(message.getSeqId(), 1, entryResult);
                 ByteBuffer b = resp.serialize();
-                peerServer.queueSendMessage(socketChannel, resp);
+                peerServer.queueSendMessage(socketChannel, resp); */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
             }  else if (messageType == MessageType.ClusterInfo.value()) {
 
                 ClusterInfoMessage message = ClusterInfoMessage.deserialize(readBuffer.rewind()) ;
