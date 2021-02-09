@@ -32,6 +32,7 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesHelloHandler());
         handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
         handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
+        handlerMap.put(MessageType.RequestVoteResponse, new RequestVoteResponseHandler());
     }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
@@ -207,7 +208,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 peerServer.setClusterInfo(message.getClusterInfo());
             } else if (messageType == MessageType.RequestVoteResponse.value()) {
 
-                LOG.info(peerServer.getServerId()+":Received RequestVoteResponse Message") ;
+                /* LOG.info(peerServer.getServerId()+":Received RequestVoteResponse Message") ;
                 RequestVoteResponseMessage message = RequestVoteResponseMessage.deserialize(readBuffer.rewind());
 
                 int votes = 0;
@@ -217,8 +218,9 @@ public class ServerMessageHandlerCallable implements Callable {
                 } else {
                     votes = peerServer.vote(false);
                     LOG.info(peerServer.getServerId()+":Did not get vote. current vote count="+votes);
-                }
-
+                } */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
             } else if (messageType == MessageType.RaftClientHello.value()) {
 
                 LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
