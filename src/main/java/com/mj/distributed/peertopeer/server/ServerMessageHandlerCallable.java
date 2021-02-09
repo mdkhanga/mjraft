@@ -31,6 +31,7 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.TestClientHello, new TestHelloHandler());
         handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesHelloHandler());
         handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
+        handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
     }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
@@ -133,7 +134,7 @@ public class ServerMessageHandlerCallable implements Callable {
 
             } else if (messageType == MessageType.RequestVote.value()) {
 
-                RequestVoteMessage message = RequestVoteMessage.deserialize(readBuffer.rewind());
+                /* RequestVoteMessage message = RequestVoteMessage.deserialize(readBuffer.rewind());
 
                 LOG.info(peerServer.getServerId() + ":Received a request vote message from " + message.getCandidateHost() + ":"
                         + message.getCandidatePort() + " for term: "+message.getTerm());
@@ -151,11 +152,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 else if (requestVoteTerm <= peerServer.getTerm()) {
                     vote = false;
                     LOG.info(peerServer.getServerId() + ": voted No because term < current term "+peerServer.getTerm());
-                } /* else if (peerServer.getRaftState() == RaftState.candidate &&
-                        requestVoteTerm <= peerServer.getTerm()+1 ) {
-                    vote = false;
-                    LOG.info(peerServer.getServerId() + ": voted No because we are candidate");
-                } */
+                }
                 else if (requestVoteTerm <= peerServer.getCurrentVotedTerm()) {
                     vote = false ;
                     LOG.info(peerServer.getServerId() + ": voted No because term < voted term "+peerServer.getCurrentVotedTerm());
@@ -173,6 +170,9 @@ public class ServerMessageHandlerCallable implements Callable {
                         vote);
 
                 peerServer.queueSendMessage(socketChannel, requestVoteResponseMessage);
+                */
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
 
             } else if (messageType == MessageType.AppendEntries.value()) {
                /* AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
