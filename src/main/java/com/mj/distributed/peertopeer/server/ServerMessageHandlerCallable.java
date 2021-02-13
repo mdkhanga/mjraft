@@ -33,6 +33,7 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
         handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
         handlerMap.put(MessageType.RequestVoteResponse, new RequestVoteResponseHandler());
+        handlerMap.put(MessageType.RaftClientHello, new RaftClientHelloHandler());
     }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
@@ -42,8 +43,7 @@ public class ServerMessageHandlerCallable implements Callable {
         readBuffer = b ;
 
     }
-
-
+    
     public Void call() {
 
         // WARNING : 11142020
@@ -223,7 +223,10 @@ public class ServerMessageHandlerCallable implements Callable {
                 m.handle(readBuffer, socketChannel, peerServer);
             } else if (messageType == MessageType.RaftClientHello.value()) {
 
-                LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
+
+               /* LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
                 peerServer.addRaftClient(socketChannel);
 
                 if (peerServer.isElectionInProgress()) {
@@ -245,7 +248,7 @@ public class ServerMessageHandlerCallable implements Callable {
 
                     // all good
                     peerServer.queueSendMessage(socketChannel, new Response(1,0));
-                }
+                } */
 
             } else if (messageType == MessageType.RaftClientAppendEntry.value()) {
 
