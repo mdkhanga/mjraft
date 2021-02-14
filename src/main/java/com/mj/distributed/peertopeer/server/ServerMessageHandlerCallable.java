@@ -33,7 +33,6 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.RaftClientAppendEntry, new RaftClientAppendEntryHandler());
         handlerMap.put(MessageType.GetServerLog, new GetServerLogHandler());
         handlerMap.put(MessageType.GetClusterInfo, new GetClusterInfoHandler());
-
     }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
@@ -52,7 +51,6 @@ public class ServerMessageHandlerCallable implements Callable {
         int messagesize = readBuffer.getInt() ;
         int messageType = readBuffer.getInt() ;
 
-
         try {
 
             MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
@@ -62,73 +60,7 @@ public class ServerMessageHandlerCallable implements Callable {
                 LOG.info("Received message of unknown type " + messageType);
             }
 
-            /* if (messageType == MessageType.Hello.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-            } else if (messageType == MessageType.Response.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-           } else if(messageType == MessageType.TestClientHello.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-            } else if (messageType == MessageType.Ack.value()) {
-
-                AckMessage message = AckMessage.deserialize(readBuffer.rewind());
-
-            } else if (messageType == MessageType.AppendEntriesResponse.value()) {
-                 MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-            } else if (messageType == MessageType.RequestVote.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-            } else if (messageType == MessageType.AppendEntries.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-            }  else if (messageType == MessageType.ClusterInfo.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-            } else if (messageType == MessageType.RequestVoteResponse.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-            } else if (messageType == MessageType.RaftClientHello.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-
-            } else if (messageType == MessageType.RaftClientAppendEntry.value()) {
-
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-
-            } else if (messageType == MessageType.GetServerLog.value()) {
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-
-            } else if (messageType == MessageType.GetClusterInfo.value()) {
-                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
-                m.handle(readBuffer, socketChannel, peerServer);
-
-            }
-            else {
-                LOG.info("Received message of unknown type " + messageType);
-            } */
-
-        } catch(Exception e) {
+         } catch(Exception e) {
             LOG.error("Error deserializing message ",e);
         }
 
