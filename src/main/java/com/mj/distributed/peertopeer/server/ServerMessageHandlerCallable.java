@@ -2,17 +2,12 @@ package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.message.*;
 import com.mj.distributed.message.handler.*;
-import com.mj.distributed.model.Error;
-import com.mj.distributed.model.LogEntry;
-import com.mj.distributed.model.Member;
-import com.mj.distributed.model.Redirect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -34,6 +29,11 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
         handlerMap.put(MessageType.RequestVoteResponse, new RequestVoteResponseHandler());
         handlerMap.put(MessageType.RaftClientHello, new RaftClientHelloHandler());
+        handlerMap.put(MessageType.ClusterInfo, new ClusterInfoHandler());
+        handlerMap.put(MessageType.RaftClientAppendEntry, new RaftClientAppendEntryHandler());
+        handlerMap.put(MessageType.GetServerLog, new GetServerLogHandler());
+        handlerMap.put(MessageType.GetClusterInfo, new GetClusterInfoHandler());
+
     }
 
     public ServerMessageHandlerCallable(PeerServer p, SocketChannel s , ByteBuffer b) {
@@ -43,7 +43,7 @@ public class ServerMessageHandlerCallable implements Callable {
         readBuffer = b ;
 
     }
-    
+
     public Void call() {
 
         // WARNING : 11142020
@@ -203,9 +203,12 @@ public class ServerMessageHandlerCallable implements Callable {
                 m.handle(readBuffer, socketChannel, peerServer);
             }  else if (messageType == MessageType.ClusterInfo.value()) {
 
-                ClusterInfoMessage message = ClusterInfoMessage.deserialize(readBuffer.rewind()) ;
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
+
+                /* ClusterInfoMessage message = ClusterInfoMessage.deserialize(readBuffer.rewind()) ;
                 LOG.info(peerServer.getServerId()+":Received clusterInfoMsg:" + message.toString());
-                peerServer.setClusterInfo(message.getClusterInfo());
+                peerServer.setClusterInfo(message.getClusterInfo()); */
             } else if (messageType == MessageType.RequestVoteResponse.value()) {
 
                 /* LOG.info(peerServer.getServerId()+":Received RequestVoteResponse Message") ;
@@ -252,13 +255,17 @@ public class ServerMessageHandlerCallable implements Callable {
 
             } else if (messageType == MessageType.RaftClientAppendEntry.value()) {
 
-                LOG.info(peerServer.getServerId()+":Received a RaftClientAppendEntry message");
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
+                /* LOG.info(peerServer.getServerId()+":Received a RaftClientAppendEntry message");
                 RaftClientAppendEntry message = RaftClientAppendEntry.deserialize(readBuffer.rewind());
-                peerServer.addLogEntry(message.getValue());
+                peerServer.addLogEntry(message.getValue()); */
 
             } else if (messageType == MessageType.GetServerLog.value()) {
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
 
-                LOG.info(peerServer.getServerId()+":Received a GetServerLog message");
+                /* LOG.info(peerServer.getServerId()+":Received a GetServerLog message");
 
                 GetServerLog message = GetServerLog.deserialize(readBuffer.rewind());
 
@@ -267,12 +274,14 @@ public class ServerMessageHandlerCallable implements Callable {
                 GetServerLogResponse response = new GetServerLogResponse(message.getSeqId(), ret);
 
                 LOG.info(peerServer.getServerId()+":Sending a GetServerLog response message");
-                peerServer.queueSendMessage(socketChannel, response);
+                peerServer.queueSendMessage(socketChannel, response); */
             } else if (messageType == MessageType.GetClusterInfo.value()) {
-                LOG.info(peerServer.getServerId()+":Received request for clusterInfo");
+                MessageHandler m = handlerMap.get(MessageType.valueOf(messageType));
+                m.handle(readBuffer, socketChannel, peerServer);
+                /* LOG.info(peerServer.getServerId()+":Received request for clusterInfo");
                 ClusterInfoMessage cm = new ClusterInfoMessage(peerServer.getClusterInfo());
                 LOG.info(peerServer.getServerId()+":cm message size = "+cm.serialize().limit());
-                peerServer.queueSendMessage(socketChannel, cm);
+                peerServer.queueSendMessage(socketChannel, cm); */
 
             }
             else {
