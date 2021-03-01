@@ -24,6 +24,8 @@ public class Leader implements State, Runnable {
 
     public void run() {
 
+        LOG.info(server.getServerId()+ ":Entering leader state");
+
         AtomicInteger count = new AtomicInteger(1);
 
         while (!stop) {
@@ -59,6 +61,7 @@ public class Leader implements State, Runnable {
 
         }
 
+        LOG.info(server.getServerId() + ": exiting leader state.");
 
     }
 
@@ -74,6 +77,7 @@ public class Leader implements State, Runnable {
 
     @Override
     public void stop() {
+        LOG.info(server.getServerId()+":received req to stop leader state");
         stop = true;
     }
 

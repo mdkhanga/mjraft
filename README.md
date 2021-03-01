@@ -15,9 +15,23 @@ This is work in progress.
 
 mvn clean install
 
-### Command line
+### Command line cluster
 
-....
+#### Start a new cluster by starting a server listening on port 5001
+
+java -cp target/mjraft-1.0-SNAPSHOT.jar com.mj.distributed.peertopeer.server.PeerServer 5001
+
+#### Add a second server listening on port 5002 which connects to the first
+
+java -cp target/mjraft-1.0-SNAPSHOT.jar com.mj.distributed.peertopeer.server.PeerServer 5002 localhost:5001
+
+#### Add a third server listening on port 5003 which connects to the first
+
+java -cp target/mjraft-1.0-SNAPSHOT.jar com.mj.distributed.peertopeer.server.PeerServer 5003 localhost:5001
+
+#### Use RaftClient to connect to any server and send values to be replicated
+
+java -cp target/mjraft-1.0-SNAPSHOT.jar com.mj.raft.client.RaftClient localhost 5001
 
 ### Embedded
 

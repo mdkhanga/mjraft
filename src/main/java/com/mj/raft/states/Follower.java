@@ -20,6 +20,8 @@ public class Follower implements State, Runnable {
 
     public void run() {
 
+        LOG.info(server.getServerId()+": Entering follower state");
+
         while(!stop) {
 
             try {
@@ -55,6 +57,7 @@ public class Follower implements State, Runnable {
 
         }
 
+        LOG.info(server.getServerId()+": Exiting follower state");
     }
 
 

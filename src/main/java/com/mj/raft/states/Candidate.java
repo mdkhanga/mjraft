@@ -41,6 +41,8 @@ public class Candidate implements State, Runnable {
 
     public void run()  {
 
+        LOG.info(server.getServerId()+":Entering candidate state") ;
+
         if (server.isElectionInProgress()) {
             LOG.info(server.getServerId()+ ":Election already in progress") ;
             return;
@@ -139,6 +141,7 @@ public class Candidate implements State, Runnable {
         }
 
         LOG.info("Election over for term " + newterm) ;
+        LOG.info(server.getServerId()+":Exiting candidate state") ;
 
     }
 
