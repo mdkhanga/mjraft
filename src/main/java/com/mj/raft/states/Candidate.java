@@ -163,7 +163,7 @@ public class Candidate implements State, Runnable {
 
     @Override
     public void changeState(State newState) {
-        server.setRaftState(newState.raftState());
+        server.setRaftState(newState);
         stop();
         newState.start();
     }

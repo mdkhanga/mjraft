@@ -50,7 +50,8 @@ public class PeerServer implements NioListenerConsumer {
 
     volatile AtomicInteger currentTerm = new AtomicInteger(0);
     volatile Long lastLeaderHeartBeatTs = 0L ;
-    volatile RaftState raftState = RaftState.follower ;
+    // volatile RaftState raftState = RaftState.follower ;
+    volatile State raftState ;
     ExecutorService peerServerExecutor = Executors.newFixedThreadPool(6) ;
     private volatile boolean stop = false ;
     private volatile boolean electionInProgress = false ;
@@ -81,7 +82,7 @@ public class PeerServer implements NioListenerConsumer {
 
         bindPort = port;
         LOG.info("Starting server on port: " + port + " state: "+ state);
-        raftState = state ;
+        raftState = getStateMachine(state) ;
         inBoundMessageCreator = new InBoundMessageCreator(this);
     }
 
@@ -105,7 +106,8 @@ public class PeerServer implements NioListenerConsumer {
 
             }
         }
-         startStateMachine();
+        // startStateMachine();
+        raftState.start();
         listener = new NioListener(bindHost, bindPort, this);
         listener.start();
     }
@@ -113,6 +115,7 @@ public class PeerServer implements NioListenerConsumer {
     public void stop() throws Exception {
         LOG.info(getServerId() + ": is stopping") ;
         stop = true;
+        raftState.stop();
         listener.stop();
     }
 
@@ -146,7 +149,7 @@ public class PeerServer implements NioListenerConsumer {
 
         leader = new Member(parts[0],Integer.parseInt(parts[1]));
 
-        if (raftState == RaftState.leader || raftState == RaftState.candidate) {
+        if (raftState.raftState() == RaftState.leader || raftState.raftState() == RaftState.candidate) {
             LOG.info(getServerId() + " Change state from leader to follower. New leader is  "+ leaderId);
 
         }
@@ -243,15 +246,15 @@ public class PeerServer implements NioListenerConsumer {
         p.queueSendMessage(m);
     }
 
-    public void setRaftState(RaftState state) {
+    public void setRaftState(State state) {
         raftState = state ;
-        if (state == RaftState.leader) {
+        if (state.raftState() == RaftState.leader) {
             leader = thisMember;
         }
     }
 
     public RaftState getRaftState() {
-        return raftState;
+        return raftState.raftState();
     }
 
     public InBoundMessageCreator getInBoundMessageCreator() {
@@ -501,7 +504,7 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    public void startStateMachine() {
+    public State getStateMachine(RaftState raftState) {
         State state = new Follower(this);
         switch (raftState) {
             case leader:
@@ -514,7 +517,7 @@ public class PeerServer implements NioListenerConsumer {
                 break;
         }
 
-        state.start();
+        return state;
     }
 
     public void startTask(Runnable r) {
