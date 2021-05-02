@@ -109,7 +109,9 @@ public class LeaderElection5ServerTest {
         Thread.sleep(35000);
 
         // check for new leader
+        System.out.println("Calling getClusterInfo 7003") ;
         cs1 = ts2.getClusterInfo();
+        System.out.println("returned getClusterInfo 7003") ;
         int port = cs1.getLeader().getPort();
         System.out.println("mj leader is " + cs1.getLeader().getHostString() + ":" + port);
 
@@ -118,7 +120,9 @@ public class LeaderElection5ServerTest {
         }
 
 
+        System.out.println("Calling getClusterInfo 7002") ;
         ClusterInfo cs2 = ts.getClusterInfo();
+        System.out.println("returned getClusterInfo 7002") ;
         System.out.println("mj leader is " + cs2.getLeader().getHostString() + ":" + cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getHostString(), cs2.getLeader().getHostString());
@@ -126,7 +130,9 @@ public class LeaderElection5ServerTest {
         // repeat
         Thread.sleep(5000);
 
+        System.out.println("2 Calling getClusterInfo 7003") ;
         cs1 = ts2.getClusterInfo();
+        System.out.println("2 returned getClusterInfo 7003") ;
         port = cs1.getLeader().getPort();
         System.out.println("mj leader is " + cs1.getLeader().getHostString() + ":" + port);
 
@@ -134,8 +140,9 @@ public class LeaderElection5ServerTest {
             assertTrue(false);
         }
 
-
+        System.out.println("2 Calling getClusterInfo 7002") ;
         cs2 = ts.getClusterInfo();
+        System.out.println("2 returned getClusterInfo 7002") ;
         System.out.println("mj leader is " + cs2.getLeader().getHostString() + ":" + cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getHostString(), cs2.getLeader().getHostString());
@@ -149,15 +156,19 @@ public class LeaderElection5ServerTest {
 
        List<Integer> aliveList = new ArrayList<>(alive);
 
+       System.out.println("ts4 trying to connect to " + aliveList.get(0)) ;
         TestClient ts4 = new TestClient("localhost", aliveList.get(0));
         ts4.connect();
-        ClusterInfo cs4 = ts2.getClusterInfo();
-        System.out.println("mj new leader is " + cs4.getLeader().getHostString() + ":" + cs4.getLeader().getPort());
+        System.out.println("ts4 connected to " + aliveList.get(0)) ;
+        ClusterInfo cs4 = ts4.getClusterInfo();
+        System.out.println("1 mj new leader is " + cs4.getLeader().getHostString() + ":" + cs4.getLeader().getPort());
 
+        System.out.println("ts5 trying to connect to " + aliveList.get(1)) ;
         TestClient ts5 = new TestClient("localhost", aliveList.get(1));
         ts5.connect();
-        ClusterInfo cs5 = ts2.getClusterInfo();
-        System.out.println("mj new leader is " + cs5.getLeader().getHostString() + ":" + cs5.getLeader().getPort());
+        System.out.println("ts5 connected to " + aliveList.get(1)) ;
+        ClusterInfo cs5 = ts5.getClusterInfo();
+        System.out.println("2 mj new leader is " + cs5.getLeader().getHostString() + ":" + cs5.getLeader().getPort());
 
         assertEquals(cs4.getLeader().getPort(), cs5.getLeader().getPort());
         assertEquals(cs4.getLeader().getHostString(), cs4.getLeader().getHostString());

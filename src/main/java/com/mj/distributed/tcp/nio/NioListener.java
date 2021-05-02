@@ -89,7 +89,7 @@ public class NioListener {
 
                     });
 
-                    selector.select();
+                    selector.select(5000);
 
                     Iterator<SelectionKey> keysIterator = selector.selectedKeys().iterator();
 

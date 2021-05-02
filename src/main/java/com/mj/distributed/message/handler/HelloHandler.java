@@ -22,11 +22,11 @@ public class HelloHandler implements MessageHandler {
 
         HelloMessage message = HelloMessage.deserialize(readBuffer.rewind());
         peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
-        LOG.info(peerServer.getServerId() + "Registered peer " + message.getHostString() + ":" + message.getHostPort());
+        // LOG.info(peerServer.getServerId() + "Registered peer " + message.getHostString() + ":" + message.getHostPort());
 
         if (peerServer.isElectionInProgress()) {
 
-            LOG.info(peerServer.getServerId() + ":Election in progress return error");
+            // LOG.info(peerServer.getServerId() + ":Election in progress return error");
             Error e = new Error(1, "Election in progress. Please wait.");
             peerServer.queueSendMessage(socketChannel,
                     new Response(0, 1, e.toBytes()));

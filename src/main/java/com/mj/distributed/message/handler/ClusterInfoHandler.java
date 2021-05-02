@@ -15,7 +15,7 @@ public class ClusterInfoHandler implements MessageHandler {
     public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
 
         ClusterInfoMessage message = ClusterInfoMessage.deserialize(readBuffer.rewind()) ;
-        LOG.info(peerServer.getServerId()+":Received clusterInfoMsg:" + message.toString());
+        // LOG.info(peerServer.getServerId()+":Received clusterInfoMsg:" + message.toString());
         peerServer.setClusterInfo(message.getClusterInfo());
 
     }

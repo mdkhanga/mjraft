@@ -95,6 +95,7 @@ public class TestClient implements NioCallerConsumer {
         Integer id = seq.getAndIncrement();
         GetClusterInfoMessage getClusterInfo = new GetClusterInfoMessage();
         nioCaller.queueSendMessage(getClusterInfo.serialize());
+        LOG.info("Testclient sent getClusterInfo wating for response") ;
         messageWaitingResponse = id;
         synchronized (messageWaitingResponse) {
 
@@ -104,6 +105,7 @@ public class TestClient implements NioCallerConsumer {
 
             }
 
+            LOG.info("Testclient getClusterInfo got a response") ;
             ClusterInfoMessage r = (ClusterInfoMessage) response ;
             ClusterInfo ret = r.getClusterInfo() ;
             response = null ;
@@ -141,6 +143,8 @@ public class TestClient implements NioCallerConsumer {
                 } else if (messageType == MessageType.ClusterInfo.value()) {
                     response = ClusterInfoMessage.deserialize(b.rewind());
                     messageWaitingResponse.notify();
+                } else {
+                    LOG.info("Unknown message type ..." + messageType) ;
                 }
 
             }

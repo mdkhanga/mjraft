@@ -21,7 +21,7 @@ public class ResponseHandler implements MessageHandler {
         Response r = Response.deserialize(readBuffer.rewind()) ;
         if (r.getStatus() == 0 && r.getType() == 1) {
 
-            LOG.info("Election in progress. Trying again") ;
+            // LOG.info("Election in progress. Trying again") ;
             // peerServer.stop() ;
             // TODO add delay
             HelloMessage m = new HelloMessage(peerServer.getBindHost(),
