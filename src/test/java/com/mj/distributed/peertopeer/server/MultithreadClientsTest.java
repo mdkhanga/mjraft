@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,7 +25,7 @@ public class MultithreadClientsTest {
     static PeerServer server1;
     static PeerServer server2;
 
-    ExecutorService executorService = Executors.newFixedThreadPool(5) ;
+    ExecutorService executorService = Executors.newFixedThreadPool(6) ;
 
     @BeforeAll
     public static void init() throws Exception {
@@ -58,17 +59,14 @@ public class MultithreadClientsTest {
 
         List<Integer> inputs = Arrays.asList(23,33,44,91,66);
 
-        /* RaftClient raftClient = new RaftClient("localhost", 5001);
-        raftClient.connect();
-
-        for (int i = 0 ; i <=4 ; i++) {
-            raftClient.send(inputs.get(i));
-        } */
+        CountDownLatch startGate = new CountDownLatch(1) ;
 
         inputs.forEach((t)->{
-            TClient tc = new TClient(t);
+            TClient tc = new TClient(t, startGate);
             executorService.submit(tc);
         });
+
+        startGate.countDown();
 
         System.out.println("Connecting to server2") ;
         TestClient ts = new TestClient("localhost",5102);
@@ -105,40 +103,7 @@ public class MultithreadClientsTest {
 
         }
 
-        /*
-        Thread.sleep(25000);
 
-        System.out.println("Connecting to server2") ;
-        TestClient ts = new TestClient("localhost",5102);
-        ts.connect();
-        System.out.println("Connected to server2") ;
-        List<byte[]> server2Values = ts.get(0,5);
-        List<Integer> server2Ints = convertToIntList(server2Values) ;
-        System.out.println("got values from server2") ;
-
-
-        System.out.println("Connecting to server3") ;
-        TestClient ts2 = new TestClient("localhost",5103);
-        ts2.connect();
-        System.out.println("Connected to server3") ;
-        List<byte[]> server3Values
-                = ts2.get(0,5);
-        List<Integer> server3Ints = convertToIntList(server3Values) ;
-
-        System.out.println("Connecting to server1");
-        TestClient ts0 = new TestClient("localhost",5101);
-        // RaftClient ts0 = new RaftClient("localhost",5002);
-        ts0.connect();
-        List<byte[]> server0Values = ts0.get(0,5);
-        List<Integer> server0Ints = convertToIntList(server0Values) ;
-
-        for (int i = 0 ; i <= 4; i++ ) {
-            assertEquals(server3Ints.get(i), server2Ints.get(i) );
-            assertEquals(server0Ints.get(i), server2Ints.get(i) );
-            System.out.println(server2Ints.get(i));
-        }
-
-        */
 
     }
 
@@ -159,14 +124,18 @@ public class MultithreadClientsTest {
     class TClient implements Callable<Void> {
 
         int val ;
+        CountDownLatch startGate;
 
 
-        TClient(int v) {
+        TClient(int v, CountDownLatch t) {
             val = v ;
+            startGate = t;
         }
 
         @Override
         public Void call() throws Exception {
+
+            startGate.await() ;
 
             RaftClient raftClient = new RaftClient("localhost", 5101);
             raftClient.connect();
