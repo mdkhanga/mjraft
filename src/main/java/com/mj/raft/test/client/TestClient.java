@@ -38,15 +38,20 @@ public class TestClient implements NioCallerConsumer {
         nioCaller.start();
         TestClientHello hello = new TestClientHello();
         messageWaitingResponse = 0 ;
+        response = null ;
         nioCaller.queueSendMessage(hello.serialize());
 
         synchronized (messageWaitingResponse) {
 
                 while(response == null ) {
 
+                    System.out.println("TestClient connect waiting got response") ;
                     messageWaitingResponse.wait();
+                    System.out.println("TestClient connect woken by notify") ;
 
                 }
+
+                System.out.println("TestClient connect got response") ;
 
                 TestClientHelloResponse r = (TestClientHelloResponse) response ;
                 response = null ;
@@ -74,8 +79,10 @@ public class TestClient implements NioCallerConsumer {
 
         Integer id = seq.getAndIncrement();
         GetServerLog gsLog = new GetServerLog(id, 0, count, (byte)0);
+        response =null ;
         nioCaller.queueSendMessage(gsLog.serialize());
         messageWaitingResponse = id;
+
         synchronized (messageWaitingResponse) {
 
             while(response == null ) {
@@ -85,6 +92,7 @@ public class TestClient implements NioCallerConsumer {
             }
 
             GetServerLogResponse r = (GetServerLogResponse) response ;
+            // response =null ;
             return r.getEntries();
         }
 
@@ -94,9 +102,11 @@ public class TestClient implements NioCallerConsumer {
 
         Integer id = seq.getAndIncrement();
         GetClusterInfoMessage getClusterInfo = new GetClusterInfoMessage();
+        response = null ;
         nioCaller.queueSendMessage(getClusterInfo.serialize());
         LOG.info("Testclient sent getClusterInfo wating for response") ;
         messageWaitingResponse = id;
+
         synchronized (messageWaitingResponse) {
 
             while(response == null ) {
@@ -134,9 +144,12 @@ public class TestClient implements NioCallerConsumer {
                 int messageSize = b.getInt();
                 int messageType = b.getInt() ;
 
+                LOG.info("Test client Received a response message type "+messageType);
+
                 if (messageType == MessageType.TestClientHelloResponse.value()) {
                     response = TestClientHelloResponse.deserialize(b.rewind());
-                    messageWaitingResponse.notify();
+                    messageWaitingResponse.notifyAll();
+                    System.out.println("Notifying test client connect done") ;
                 } else if (messageType == MessageType.GetServerLogResponse.value()) {
                     response = GetServerLogResponse.deserialize(b.rewind());
                     messageWaitingResponse.notify();
@@ -146,7 +159,7 @@ public class TestClient implements NioCallerConsumer {
                 } else {
                     LOG.info("Unknown message type ..." + messageType) ;
                 }
-
+                System.out.println("Should be releasing the lock here") ;
             }
         } catch(Exception e) {
             LOG.error("Error deserializing message",e) ;
