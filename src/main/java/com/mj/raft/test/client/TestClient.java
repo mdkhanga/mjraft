@@ -144,12 +144,12 @@ public class TestClient implements NioCallerConsumer {
                 int messageSize = b.getInt();
                 int messageType = b.getInt() ;
 
-                LOG.info("Test client Received a response message type "+messageType);
+                // LOG.info("Test client Received a response message type "+messageType);
 
                 if (messageType == MessageType.TestClientHelloResponse.value()) {
                     response = TestClientHelloResponse.deserialize(b.rewind());
                     messageWaitingResponse.notifyAll();
-                    System.out.println("Notifying test client connect done") ;
+                    // System.out.println("Notifying test client connect done") ;
                 } else if (messageType == MessageType.GetServerLogResponse.value()) {
                     response = GetServerLogResponse.deserialize(b.rewind());
                     messageWaitingResponse.notify();
@@ -159,7 +159,7 @@ public class TestClient implements NioCallerConsumer {
                 } else {
                     LOG.info("Unknown message type ..." + messageType) ;
                 }
-                System.out.println("Should be releasing the lock here") ;
+                // System.out.println("Should be releasing the lock here") ;
             }
         } catch(Exception e) {
             LOG.error("Error deserializing message",e) ;

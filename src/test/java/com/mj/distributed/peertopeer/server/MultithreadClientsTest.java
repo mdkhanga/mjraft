@@ -25,7 +25,7 @@ public class MultithreadClientsTest {
     static PeerServer server1;
     static PeerServer server2;
 
-    ExecutorService executorService = Executors.newFixedThreadPool(6) ;
+    ExecutorService executorService = Executors.newFixedThreadPool(11) ;
 
     @BeforeAll
     public static void init() throws Exception {
@@ -57,7 +57,7 @@ public class MultithreadClientsTest {
     @Test
     public void MultiThreadedlogReplication() throws Exception {
 
-        List<Integer> inputs = Arrays.asList(23,33,44,91,66);
+        List<Integer> inputs = Arrays.asList(23,33,44,91,66,101,12,172,81,312);
 
         CountDownLatch startGate = new CountDownLatch(1) ;
 
@@ -85,7 +85,7 @@ public class MultithreadClientsTest {
 
         Thread.sleep(15000);
 
-        for (int i = 0 ; i < 5 ; i++) {
+        for (int i = 0 ; i < 10 ; i++) {
 
             List<byte[]> server0Values = ts0.get(i,1);
             List<Integer> server0Ints = convertToIntList(server0Values) ;
