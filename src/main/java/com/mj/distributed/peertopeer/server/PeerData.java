@@ -17,19 +17,12 @@ public class PeerData {
     private String hostString ;
     private int port ;
     private int serverId ;
-    private int lastSeqAcked ;
     private volatile AtomicInteger seq = new AtomicInteger(0) ;
     private volatile ConcurrentHashMap<Integer, Integer> seqIdLogIndexMap = new ConcurrentHashMap() ;
     private volatile int lastIndexReplicated = -1;
-    private volatile int lastIndexCommitted = -1;
 
     private Logger LOG  = LoggerFactory.getLogger(PeerData.class);
 
-    Queue<ByteBuffer> writeQueue = new ConcurrentLinkedDeque<>() ;
-
-    public PeerData(String hostString) {
-        this.hostString = hostString ;
-    }
 
     public PeerData(String hostString, int port) {
 
@@ -43,36 +36,7 @@ public class PeerData {
         return seq.incrementAndGet() ;
     }
 
-    public ByteBuffer getNextWriteBuffer() {
-        return writeQueue.poll() ;
-    }
 
-    public ByteBuffer peekWriteBuffer() {
-        return writeQueue.peek() ;
-    }
-
-    public void addWriteBuffer(ByteBuffer b) {
-        writeQueue.add(b) ;
-    }
-
-    // public void addMessageForPeer(AppendEntriesMessage msg) throws Exception {
-    public void addMessageForPeer(Message msg) throws Exception {
-       // List<LogEntry> entries = msg.getLogEntries() ;
-
-        if ( msg instanceof AppendEntriesMessage) {
-
-            AppendEntriesMessage amsg = (AppendEntriesMessage)msg ;
-
-            LogEntry e = amsg.getLogEntry();
-
-            if (e != null) {
-               // LOG.info("Putting inseq id Map") ;
-                seqIdLogIndexMap.put(amsg.getSeqId(), e.getIndex());
-            }
-        }
-        ByteBuffer b = msg.serialize() ;
-        addWriteBuffer(b);
-    }
 
     public void addToSeqIdIndexMap(AppendEntriesMessage amsg) {
 
@@ -89,9 +53,6 @@ public class PeerData {
         return hostString ;
     }
 
-    public void setHostString(String s) {
-        hostString = s ;
-    }
 
     public int getPort() {
         return port ;
@@ -101,21 +62,6 @@ public class PeerData {
         port = p ;
     }
 
-    public int getLastIndexCommitted() {
-        return lastIndexCommitted ;
-    }
-
-    public void setLastIndexCommitted(int i) {
-        lastIndexCommitted = i ;
-    }
-
-    public int getLastIndexReplicated() {
-        return lastIndexReplicated ;
-    }
-
-    public void setLastIndexReplicated(int i) {
-        lastIndexReplicated = i;
-    }
 
     public int getNextIndexToReplicate(int maxIndex) {
 
@@ -142,7 +88,4 @@ public class PeerData {
         return serverId;
     }
 
-    public void setServerId(int i) {
-        serverId = i ;
-    }
 }
