@@ -38,7 +38,13 @@ public class AppendEntriesHandler implements MessageHandler {
         boolean entryResult = true ;
         LogEntry e = message.getLogEntry() ;
         entryResult = peerServer.processLogEntry(e,message.getPrevIndex(),message.getLeaderCommitIndex()) ;
-        AppendEntriesResponse resp = new AppendEntriesResponse(message.getSeqId(), 1, entryResult);
+
+        int index = -1;
+        if (e != null) {
+            index = e.getIndex();
+        }
+
+        AppendEntriesResponse resp = new AppendEntriesResponse(index, 1, entryResult);
         ByteBuffer b = resp.serialize();
         peerServer.queueSendMessage(socketChannel, resp);
 

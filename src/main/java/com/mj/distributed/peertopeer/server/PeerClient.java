@@ -28,19 +28,19 @@ public class PeerClient implements NioCallerConsumer {
     DataOutputStream dos;
     Integer peerServerId = -1;
     int remotePort; // port returned remote initiates the connection - other end of socket after our accept
-    int remoteListenPort ; // if we initate connection, this is where we connect to
+    int remoteListenPort; // if we initate connection, this is where we connect to
     InetAddress remoteIpAddress;
 
-    String remoteHost ;
+    String remoteHost;
 
-    ExecutorService peerClientExecutor = Executors.newFixedThreadPool(3) ;
+    ExecutorService peerClientExecutor = Executors.newFixedThreadPool(3);
 
-    public volatile Queue<ByteBuffer> writeQueue = new ConcurrentLinkedDeque<ByteBuffer>() ;
+    public volatile Queue<ByteBuffer> writeQueue = new ConcurrentLinkedDeque<ByteBuffer>();
 
 
     Logger LOG = LoggerFactory.getLogger(PeerClient.class);
 
-    private NioCaller nioCaller ;
+    private NioCaller nioCaller;
 
 
     private PeerClient() {
@@ -49,10 +49,9 @@ public class PeerClient implements NioCallerConsumer {
 
     public PeerClient(String host, int port, PeerServer p) {
 
-       this.remoteHost = host ;
-       this.remotePort = port ;
-       this.peerServer = p ;
-
+        this.remoteHost = host;
+        this.remotePort = port;
+        this.peerServer = p;
 
 
     }
@@ -62,7 +61,7 @@ public class PeerClient implements NioCallerConsumer {
 
         nioCaller = new NioCaller(remoteHost, remotePort,
                 peerServer.getBindHost(),
-                peerServer.getBindPort(),this);
+                peerServer.getBindPort(), this);
         nioCaller.start();
 
         // PeerClientStatusCallable peerClientStatusCallable = new PeerClientStatusCallable();
@@ -88,7 +87,7 @@ public class PeerClient implements NioCallerConsumer {
     }
 
     public void droppedConnection(SocketChannel s) {
-        LOG.info(peerServer.getServerId()+ ": a connection dropped");
+        LOG.info(peerServer.getServerId() + ": a connection dropped");
         peerServer.removePeer(s);
     }
 
@@ -118,31 +117,8 @@ public class PeerClient implements NioCallerConsumer {
     }
 
     public String getPeerServer() {
-        return remoteIpAddress.toString()+":"+remoteListenPort;
+        return remoteIpAddress.toString() + ":" + remoteListenPort;
     }
 
-
-    public class PeerClientStatusCallable implements Callable<Void> {
-
-        public Void call() throws Exception {
-
-            int count = 0 ;
-
-            boolean leaderElectionStarted = false ;
-
-            Candidate leaderElection = null ;
-
-            while(true) {
-
-                Thread.sleep(10000);
-
-
-                peerServer.logRlog();
-
-
-            }
-        }
-
-    }
 
 }

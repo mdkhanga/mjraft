@@ -18,7 +18,7 @@ public class PeerData {
     private int port ;
     private int serverId ;
     private volatile AtomicInteger seq = new AtomicInteger(0) ;
-    private volatile ConcurrentHashMap<Integer, Integer> seqIdLogIndexMap = new ConcurrentHashMap() ;
+    // private volatile ConcurrentHashMap<Integer, Integer> seqIdLogIndexMap = new ConcurrentHashMap() ;
     private volatile int lastIndexReplicated = -1;
 
     private Logger LOG  = LoggerFactory.getLogger(PeerData.class);
@@ -37,8 +37,7 @@ public class PeerData {
     }
 
 
-
-    public void addToSeqIdIndexMap(AppendEntriesMessage amsg) {
+    /* public void addToSeqIdIndexMap(AppendEntriesMessage amsg) {
 
         LogEntry e = amsg.getLogEntry();
 
@@ -47,7 +46,7 @@ public class PeerData {
             seqIdLogIndexMap.put(amsg.getSeqId(), e.getIndex());
         }
 
-    }
+    } */
 
     public String getHostString() {
         return hostString ;
@@ -79,9 +78,9 @@ public class PeerData {
         return -1 ;
     }
 
-    public int getIndexAcked(int seqId) {
+    /* public int getIndexAcked(int seqId) {
         return seqIdLogIndexMap.getOrDefault(seqId, -1);
-    }
+    } */
 
 
     public int getServerId() {

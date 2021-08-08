@@ -24,7 +24,7 @@ public class ServerMessageHandlerCallable implements Callable {
         handlerMap.put(MessageType.Hello, new HelloHandler());
         handlerMap.put(MessageType.Response, new ResponseHandler());
         handlerMap.put(MessageType.TestClientHello, new TestHelloHandler());
-        handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesHelloHandler());
+        handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesResponseHandler());
         handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
         handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
         handlerMap.put(MessageType.RequestVoteResponse, new RequestVoteResponseHandler());

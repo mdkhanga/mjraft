@@ -10,7 +10,8 @@ import java.nio.ByteBuffer;
 public class AppendEntriesResponse implements Message {
 
     private static MessageType messageType = MessageType.AppendEntriesResponse ;
-    private int seqOfMessageAcked ;
+    // private int seqOfMessageAcked ;
+    private int indexAcked ;
     private int term;
     private int success; // 1 = true, 0 = false
 
@@ -19,21 +20,21 @@ public class AppendEntriesResponse implements Message {
     }
 
     public AppendEntriesResponse(int id, int term, boolean success) {
-        this.seqOfMessageAcked= id ;
+        this.indexAcked= id ;
         this.term = term;
         this.success = success == true ? 1 : 0;
 
     }
 
     public AppendEntriesResponse(int id, int term, int s) {
-        this.seqOfMessageAcked= id ;
+        this.indexAcked= id ;
         this.term = term;
         this.success = s;
 
     }
 
-    public int getSeqOfMessageAcked() {
-        return seqOfMessageAcked;
+    public int getIndexAcked() {
+        return indexAcked;
     }
 
     public boolean isSuccess() {
@@ -49,7 +50,7 @@ public class AppendEntriesResponse implements Message {
         ByteArrayOutputStream b = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(b);
         d.writeInt(messageType.value());
-        d.writeInt(seqOfMessageAcked) ;
+        d.writeInt(indexAcked) ;
         d.writeByte(success);
         d.writeInt(term);
 

@@ -30,10 +30,8 @@ public class Candidate implements State, Runnable {
 
     public Candidate(PeerServer p) {
         server = p ;
-        // int numServers = p.getClusterInfo().getMembers().size() - 1;
         members = p.getMembers();
         requiredVotes = Utils.majority(members.size()) ;
-        // newterm = p.getCurrentElectionTerm();
 
     }
 
@@ -56,10 +54,6 @@ public class Candidate implements State, Runnable {
 
         LOG.info(server.getServerId()+ ":Started leader election at "+ electionStartTime + " for term "+ newterm);
 
-
-        // get the list of available servers
-        // List<Member> members = server.getClusterInfo().getMembers();
-
         synchronized (members) {
             members.forEach((m) -> {
                 try {
@@ -74,16 +68,9 @@ public class Candidate implements State, Runnable {
                         return ;
                     }
 
-                    /* if (m.getPort() == 5002) {
-                        return ;
-                    } */
 
                     LOG.info(server.getServerId() +":Sending request vote message to "+m.getHostString()+":"+m.getPort()) ;
 
-                    /* PeerClient pc = new PeerClient(m.getHostString(), m.getPort(), server);
-                    pc.start();
-                    HelloMessage hm = new HelloMessage(server.getBindHost(), server.getBindPort());
-                    pc.queueSendMessage(hm.serialize()); */
 
                     Peer pc = server.getPeer(m);
 
@@ -92,7 +79,6 @@ public class Candidate implements State, Runnable {
                             server.getBindHost(),
                             server.getBindPort(),
                             server.getLastCommittedEntry());
-                    // pc.queueSendMessage(rv.serialize());
                     pc.queueSendMessage(rv);
                 } catch (Exception e) {
                     LOG.error("Error starting client in leader election", e);

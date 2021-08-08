@@ -1,8 +1,6 @@
 package com.mj.distributed.message.handler;
 
 import com.mj.distributed.message.AppendEntriesResponse;
-import com.mj.distributed.message.TestClientHelloResponse;
-import com.mj.distributed.peertopeer.server.PeerData;
 import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,16 +8,16 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
-public class AppendEntriesHelloHandler implements MessageHandler {
+public class AppendEntriesResponseHandler implements MessageHandler {
 
-    private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesHelloHandler.class);
+    private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesResponseHandler.class);
 
     public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
 
         AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
-        PeerData d = peerServer.getPeerData(socketChannel);
-        int index = d.getIndexAcked(message.getSeqOfMessageAcked());
-        // LOG.info("Got AppendEntries response from" + d.getHostString() + "  " + d.getPort()) ;
+        // PeerData d = peerServer.getPeerData(socketChannel);
+        // int index = d.getIndexAcked(message.getSeqOfMessageAcked());
+        int index = message.getIndexAcked();
 
 
         if (index >= 0) {

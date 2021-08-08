@@ -253,13 +253,6 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    public RaftState getRaftState() {
-        return raftState.raftState();
-    }
-
-    public InBoundMessageCreator getInBoundMessageCreator() {
-        return inBoundMessageCreator;
-    }
 
     public boolean processLogEntry(LogEntry e, int prevIndex, int lastComittedIndex) throws Exception {
         boolean ret = true ;
@@ -361,8 +354,9 @@ public class PeerServer implements NioListenerConsumer {
             p.addLogEntry(entry);
             p.setPrevIndex(index-1);
         }
-        v.addToSeqIdIndexMap(p);
+        // v.addToSeqIdIndexMap(p); Not being used
         peer.queueSendMessage(p);
+        // Questionable code -- need to check if q already exists
         ConcurrentLinkedQueue<Integer> q = new ConcurrentLinkedQueue<Integer>();
         q.add(1); // self
         ackCountMap.put(index, q);
