@@ -277,8 +277,11 @@ public class PeerServer implements NioListenerConsumer {
     }
 
     public List<byte[]> getLogEntries(int start, int count) {
+        LOG.info("start = " + start + " count = " + count) ;
         ArrayList<byte[]> ret = new ArrayList<>();
-        for (int i = start; i < start+count ; i++) {
+        int end = start + count < rlog.size() ? start + count - 1 : rlog.size() -1 ;
+        LOG.info("end = " + end);
+        for (int i = start; i <= end ; i++) {
             ret.add(rlog.get(i));
         }
         return ret ;
@@ -318,7 +321,7 @@ public class PeerServer implements NioListenerConsumer {
 
     public void addLogEntry(byte[] value) throws Exception {
         rlog.add(value);
-        logRlog();
+       // logRlog();
     }
 
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
@@ -466,7 +469,7 @@ public class PeerServer implements NioListenerConsumer {
         StringBuilder sb = new StringBuilder("Replicated Log [") ;
         rlog.forEach((k)->{
             try {
-                sb.append(ByteBuffer.wrap(k).getInt()) ;
+                sb.append(ByteBuffer.wrap(k)) ;
                 sb.append(",") ;
             } catch(Exception e) {
                 LOG.error("Error getting remote address ",e) ;

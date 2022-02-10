@@ -107,10 +107,18 @@ public class RaftClient implements NioCallerConsumer {
 
     }
 
+    public void send(byte[] val) throws Exception {
+
+        RaftClientAppendEntry entry = new RaftClientAppendEntry(val);
+        nioCaller.queueSendMessage(entry.serialize());
+
+    }
+
     public List<byte[]> get(int start, int count) throws Exception {
 
         Integer id = seq.getAndIncrement();
-        GetServerLog gsLog = new GetServerLog(id, 0, count, (byte)0);
+        GetServerLog gsLog = new GetServerLog(id, start, count, (byte)0);
+        response = null ;
         nioCaller.queueSendMessage(gsLog.serialize());
         messageWaitingResponse = id;
         synchronized (messageWaitingResponse) {
@@ -138,7 +146,7 @@ public class RaftClient implements NioCallerConsumer {
 
         try {
 
-            LOG.info("Raft client Received a response message "+numBytes);
+            // LOG.info("Raft client Received a response message "+numBytes);
 
             synchronized (messageWaitingResponse) {
 
@@ -146,7 +154,7 @@ public class RaftClient implements NioCallerConsumer {
                 int messageSize = b.getInt();
                 int messageType = b.getInt() ;
 
-                LOG.info("Raft client Received a response messageType "+ messageType);
+                // LOG.info("Raft client Received a response messageType "+ messageType);
 
                 if (messageType == MessageType.RaftClientHelloResponse.value()) {
                     response = RaftClientHelloResponse.deserialize(b.rewind());
@@ -171,10 +179,9 @@ public class RaftClient implements NioCallerConsumer {
 
     public static void main(String[] args) throws Exception {
 
-        // RaftClient client = new RaftClient("localhost",5001);
         RaftClient client = new RaftClient(args[0],Integer.parseInt(args[1]));
         client.connect();
-        client.send(23);
+//        client.send(23);
 
         Scanner scanner = new Scanner(System.in);
 
@@ -182,7 +189,8 @@ public class RaftClient implements NioCallerConsumer {
 
             System.out.print("Enter a number:") ;
             String s = scanner.nextLine();
-            client.send(Integer.valueOf(s));
+            // client.send(Integer.valueOf(s));
+            client.send(s.getBytes());
 
         }
     }
