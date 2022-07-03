@@ -1,6 +1,5 @@
 # mjraft
 Java implementation of the raft protocol as described by the paper https://raft.github.io/raft.pdf
-This is work in progress.
 
 ## Supported features
 - Log replication
