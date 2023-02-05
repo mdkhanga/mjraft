@@ -9,7 +9,6 @@ Java implementation of the raft protocol as described by the paper https://raft.
 - Redirect to leader from follower/candidate
 
 ## Usage
-
 ### Building the code
 
 mvn clean install
