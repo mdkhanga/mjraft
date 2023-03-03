@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -114,7 +115,16 @@ public class NioCaller {
                     // Check what event is available and deal with it
                     if (key.isConnectable()) {
                         // LOG.info("trying to conect") ;
-                        finishConnection(key);
+                        try {
+                            finishConnection(key);
+                        } catch(ConnectException ce) {
+                            LOG.error("Error connecting. Will wait for event",ce);
+                            Thread.sleep(10000);
+                            clientChannel = SocketChannel.open();
+                            clientChannel.configureBlocking(false);
+                            clientChannel.connect(new InetSocketAddress(remoteHost, remotePort));
+                            clientChannel.register(selector, SelectionKey.OP_CONNECT);
+                        }
                     } else if (key.isReadable()) {
                         // LOG.info("trying to read") ;
                         read(key);
