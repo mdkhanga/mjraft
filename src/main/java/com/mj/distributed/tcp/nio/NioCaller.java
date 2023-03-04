@@ -56,13 +56,7 @@ public class NioCaller {
         try {
 
             selector = Selector.open();
-
-            clientChannel = SocketChannel.open();
-            clientChannel.configureBlocking(false);
-
-            clientChannel.connect(new InetSocketAddress(remoteHost, remotePort));
-
-            clientChannel.register(selector, SelectionKey.OP_CONNECT);
+            connect();
 
             executorThread.submit(this::call);
 
@@ -119,11 +113,9 @@ public class NioCaller {
                             finishConnection(key);
                         } catch(ConnectException ce) {
                             LOG.error("Error connecting. Will wait for event",ce);
+                            // sleep and retry
                             Thread.sleep(10000);
-                            clientChannel = SocketChannel.open();
-                            clientChannel.configureBlocking(false);
-                            clientChannel.connect(new InetSocketAddress(remoteHost, remotePort));
-                            clientChannel.register(selector, SelectionKey.OP_CONNECT);
+                            connect();
                         }
                     } else if (key.isReadable()) {
                         // LOG.info("trying to read") ;
@@ -249,6 +241,13 @@ public class NioCaller {
 
         selector.wakeup() ;
 
+    }
+
+    private void connect() throws IOException {
+        clientChannel = SocketChannel.open();
+        clientChannel.configureBlocking(false);
+        clientChannel.connect(new InetSocketAddress(remoteHost, remotePort));
+        clientChannel.register(selector, SelectionKey.OP_CONNECT);
     }
 
 }

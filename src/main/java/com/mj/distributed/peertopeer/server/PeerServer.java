@@ -262,7 +262,7 @@ public class PeerServer implements NioListenerConsumer {
             if (prevIndex + 1 == expectedNextEntry) {
                 addLogEntry(data);
                 ret = true ;
-                if (lastComittedIndex <= expectedNextEntry) {
+                if (lastComittedIndex <= expectedNextEntry) { // do we need this ?
                     this.lastComittedIndex.set(lastComittedIndex);
                 }
             } else {
