@@ -10,12 +10,14 @@ public class LogEntry {
     private int term ;
     private byte[] entry;
 
-    public LogEntry(int index, int value) {
+    public LogEntry(int term, int index, int value) {
+        this.term = term;
         this.index = index;
         this.entry = ByteBuffer.allocate(4).putInt(value).array();
     }
 
-    public LogEntry(int index, byte[] val) {
+    public LogEntry(int term, int index, byte[] val) {
+        this.term = term;
         this.index = index;
         this.entry = val;
     }
@@ -23,6 +25,7 @@ public class LogEntry {
     public byte[] toBytes() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(out);
+        d.writeInt(term);
         d.writeInt(index);
         int size = entry.length;
         d.writeInt(size);
@@ -39,6 +42,7 @@ public class LogEntry {
 
         ByteArrayInputStream bin = new ByteArrayInputStream(bytes);
         DataInputStream din = new DataInputStream(bin);
+        int term = din.readInt();
         int index = din.readInt() ;
         // int v = din.readInt();
         int size = din.readInt();
@@ -49,7 +53,7 @@ public class LogEntry {
             din.read(v,0, size);
         }
 
-        return new LogEntry(index, v);
+        return new LogEntry(term, index, v);
 
     }
 
