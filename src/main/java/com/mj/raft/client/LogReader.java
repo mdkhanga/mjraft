@@ -1,7 +1,5 @@
 package com.mj.raft.client;
 
-import com.mj.distributed.model.LogEntry;
-
 import java.util.List;
 
 public class LogReader {

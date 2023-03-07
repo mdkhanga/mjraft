@@ -1,6 +1,6 @@
 package com.mj.distributed.message;
 
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +17,7 @@ public class AppendEntriesMessage implements Message {
     private String leaderId ;
 
     private int term = 0 ;
-    private List<LogEntry> entries = new ArrayList<>();
+    private List<LogEntryWithIndex> entries = new ArrayList<>();
 
     private int prevTerm = -1 ;
     private int prevIndex = -1 ;
@@ -42,15 +42,15 @@ public class AppendEntriesMessage implements Message {
         this.leaderCommitIndex = leaderCommitIndex;
     }
 
-    public void addLogEntry(LogEntry e) {
+    public void addLogEntry(LogEntryWithIndex e) {
         entries.add(e);
     }
 
-    public List<LogEntry> getLogEntries() {
+    public List<LogEntryWithIndex> getLogEntries() {
         return entries;
     }
 
-    public LogEntry getLogEntry() {
+    public LogEntryWithIndex getLogEntry() {
         return entries.size() == 1 ? entries.get(0) : null;
     }
 
@@ -144,7 +144,7 @@ public class AppendEntriesMessage implements Message {
             int size = b.getInt();
             byte[] entrybytes = new byte[size];
             b = b.get(entrybytes, 0, size);
-            newMsg.addLogEntry(LogEntry.fromBytes(entrybytes));
+            newMsg.addLogEntry(LogEntryWithIndex.fromBytes(entrybytes));
             --numEntries;
         }
 

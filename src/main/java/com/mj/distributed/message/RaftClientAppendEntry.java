@@ -1,6 +1,5 @@
 package com.mj.distributed.message;
 
-import com.mj.distributed.model.LogEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

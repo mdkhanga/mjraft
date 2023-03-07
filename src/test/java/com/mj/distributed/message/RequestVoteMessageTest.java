@@ -1,6 +1,6 @@
 package com.mj.distributed.message;
 
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -17,7 +17,7 @@ public class RequestVoteMessageTest {
                 3,
                 "192.168.5.21",
                 5050,
-                new LogEntry(33, 74)
+                new LogEntryWithIndex(3, 33, 74)
         );
 
         ByteBuffer b = requestVoteMessage.serialize();

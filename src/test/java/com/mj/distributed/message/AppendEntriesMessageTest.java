@@ -1,6 +1,6 @@
 package com.mj.distributed.message;
 
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import org.junit.jupiter.api.Test;
 
 
@@ -12,7 +12,7 @@ public class AppendEntriesMessageTest {
     public void serialize() throws Exception {
 
         AppendEntriesMessage msg = new AppendEntriesMessage("localhost:5001",1);
-        LogEntry e = new LogEntry(0,4);
+        LogEntryWithIndex e = new LogEntryWithIndex(3, 0,4);
 
         msg.addLogEntry(e);
 

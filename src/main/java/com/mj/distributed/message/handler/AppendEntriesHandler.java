@@ -2,8 +2,7 @@ package com.mj.distributed.message.handler;
 
 import com.mj.distributed.message.AppendEntriesMessage;
 import com.mj.distributed.message.AppendEntriesResponse;
-import com.mj.distributed.message.TestClientHelloResponse;
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import com.mj.distributed.peertopeer.server.PeerData;
 import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
@@ -21,6 +20,13 @@ public class AppendEntriesHandler implements MessageHandler {
         AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
         PeerData d = peerServer.getPeerData(socketChannel);
 
+        // AppendRPC rule 1 5.1 Page 4
+        if (message.getTerm() < peerServer.getTerm()) {
+            AppendEntriesResponse resp = new AppendEntriesResponse(-1, peerServer.getTerm(), false);
+            ByteBuffer b = resp.serialize();
+            peerServer.queueSendMessage(socketChannel, resp);
+        }
+
         if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||
                 message.getTerm() > peerServer.getTerm()) {
             LOG.info(peerServer.getServerId()+ ":We have a new leader :" + message.getLeaderId());
@@ -32,12 +38,13 @@ public class AppendEntriesHandler implements MessageHandler {
             }
         }
 
-
         // LOG.info("Got append entries message "+ message.getLeaderId() + " " + d.getHostString() + " " + d.getPort());
         peerServer.setLastLeaderHeartBeatTs(System.currentTimeMillis());
         boolean entryResult = true ;
-        LogEntry e = message.getLogEntry() ;
-        entryResult = peerServer.processLogEntry(e,message.getPrevIndex(),message.getLeaderCommitIndex()) ;
+        LogEntryWithIndex e = message.getLogEntry() ;
+
+        // rule 2 return false if prev entry does not match
+        entryResult = peerServer.processLogEntry(e,message.getPrevIndex(), message.getTerm(), message.getLeaderCommitIndex()) ;
 
         int index = -1;
         if (e != null) {

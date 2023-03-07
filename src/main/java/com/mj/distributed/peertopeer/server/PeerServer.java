@@ -16,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.*;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.*;
@@ -42,7 +41,7 @@ public class PeerServer implements NioListenerConsumer {
 
     public InBoundMessageCreator inBoundMessageCreator;
 
-    List<byte[]> rlog = Collections.synchronizedList(new ArrayList<>());
+    List<LogEntry> rlog = Collections.synchronizedList(new ArrayList<>());
     volatile AtomicInteger lastComittedIndex  = new AtomicInteger(-1) ;
 
     volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
@@ -183,11 +182,14 @@ public class PeerServer implements NioListenerConsumer {
         return m;
     }
 
-    public LogEntry getLastCommittedEntry() {
+    public LogEntryWithIndex getLastCommittedEntry() {
         if (lastComittedIndex.get() >= 0) {
-            return new LogEntry(lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
+            // return new LogEntry(getTerm(),lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
+            int index = lastComittedIndex.get();
+            LogEntry e = rlog.get(index);
+            return new LogEntryWithIndex(getTerm(), index, e.getEntry());
         } else {
-            return new LogEntry(lastComittedIndex.get(), new byte[1]);
+            return new LogEntryWithIndex(getTerm(), lastComittedIndex.get(), new byte[1]);
         }
     }
 
@@ -254,12 +256,14 @@ public class PeerServer implements NioListenerConsumer {
     }
 
 
-    public boolean processLogEntry(LogEntry e, int prevIndex, int lastComittedIndex) throws Exception {
+    public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
         boolean ret = true ;
         if (e != null) {
             byte[] data = e.getEntry();
             int expectedNextEntry = rlog.size();
             if (prevIndex + 1 == expectedNextEntry) {
+
+
                 addLogEntry(data);
                 ret = true ;
                 if (lastComittedIndex <= expectedNextEntry) { // do we need this ?
@@ -282,7 +286,7 @@ public class PeerServer implements NioListenerConsumer {
         int end = start + count < rlog.size() ? start + count - 1 : rlog.size() -1 ;
         LOG.info("end = " + end);
         for (int i = start; i <= end ; i++) {
-            ret.add(rlog.get(i));
+            ret.add(rlog.get(i).getEntry());
         }
         return ret ;
     }
@@ -320,8 +324,8 @@ public class PeerServer implements NioListenerConsumer {
     }
 
     public void addLogEntry(byte[] value) throws Exception {
-        rlog.add(value);
-       // logRlog();
+        // rlog.add(value);
+        rlog.add(new LogEntry(getTerm(), value));
     }
 
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
@@ -351,9 +355,9 @@ public class PeerServer implements NioListenerConsumer {
 
         int index = getIndexToReplicate(v) ;
         if (index >= 0 && index < rlog.size()) {
-            byte[] data = rlog.get(index);
+            byte[] data = rlog.get(index).getEntry();
             // LOG.info("Replicating ..." + ByteBuffer.wrap(data).getInt());
-            LogEntry entry = new LogEntry(index, data);
+            LogEntryWithIndex entry = new LogEntryWithIndex(getTerm(),index, data);
             p.addLogEntry(entry);
             p.setPrevIndex(index-1);
         }
@@ -469,7 +473,7 @@ public class PeerServer implements NioListenerConsumer {
         StringBuilder sb = new StringBuilder("Replicated Log [") ;
         rlog.forEach((k)->{
             try {
-                sb.append(ByteBuffer.wrap(k)) ;
+                sb.append(ByteBuffer.wrap(k.getEntry())) ;
                 sb.append(",") ;
             } catch(Exception e) {
                 LOG.error("Error getting remote address ",e) ;

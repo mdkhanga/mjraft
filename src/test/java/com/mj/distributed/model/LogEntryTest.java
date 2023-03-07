@@ -11,29 +11,31 @@ class LogEntryTest {
     @Test
     void toBytesInt() throws Exception {
 
-        LogEntry e1 = new LogEntry(3, 47);
+        LogEntryWithIndex e1 = new LogEntryWithIndex(2, 3, 47);
 
         byte[] e1bytes = e1.toBytes() ;
 
-        LogEntry e1copy = LogEntry.fromBytes(e1bytes);
+        LogEntryWithIndex e1copy = LogEntryWithIndex.fromBytes(e1bytes);
 
         assertEquals(3, e1copy.getIndex());
         int ret = ByteBuffer.wrap(e1copy.getEntry()).getInt();
         assertEquals(47,ret);
+        assertEquals(2, e1copy.getTerm());
 
     }
 
     @Test
     void toBytesString() throws Exception {
 
-        LogEntry e1 = new LogEntry(7, "Hello".getBytes());
+        LogEntryWithIndex e1 = new LogEntryWithIndex(4, 7, "Hello".getBytes());
 
         byte[] e1bytes = e1.toBytes() ;
 
-        LogEntry e1copy = LogEntry.fromBytes(e1bytes);
+        LogEntryWithIndex e1copy = LogEntryWithIndex.fromBytes(e1bytes);
 
         assertEquals(7, e1copy.getIndex());
         assertEquals("Hello",new String(e1copy.getEntry()));
+        assertEquals(4, e1copy.getTerm());
 
     }
 }

@@ -1,15 +1,8 @@
 package com.mj.distributed.peertopeer.server;
 
-import com.mj.distributed.message.AppendEntriesMessage;
-import com.mj.distributed.message.Message;
-import com.mj.distributed.model.LogEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class PeerData {

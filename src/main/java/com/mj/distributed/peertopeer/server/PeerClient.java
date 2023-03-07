@@ -1,10 +1,9 @@
 package com.mj.distributed.peertopeer.server;
 
+import com.mj.distributed.model.LogEntryWithIndex;
 import com.mj.distributed.tcp.nio.NioCaller;
 import com.mj.distributed.tcp.nio.NioCallerConsumer;
-import com.mj.distributed.model.LogEntry;
 import com.mj.distributed.model.Member;
-import com.mj.raft.states.Candidate;
 import org.slf4j.LoggerFactory ;
 import org.slf4j.Logger ;
 import java.io.DataOutputStream;
@@ -12,7 +11,6 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,9 +67,9 @@ public class PeerClient implements NioCallerConsumer {
 
     }
 
-    public boolean processLogEntry(LogEntry e, int prevIndex, int lastComittedIndex) throws Exception {
+    public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
 
-        return peerServer.processLogEntry(e, prevIndex, lastComittedIndex);
+        return peerServer.processLogEntry(e, prevIndex, prevTerm, lastComittedIndex);
     }
 
     public void setLeaderHeartBeatTs(long ts) {

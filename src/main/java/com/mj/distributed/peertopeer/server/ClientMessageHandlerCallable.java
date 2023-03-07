@@ -1,7 +1,7 @@
 package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.message.*;
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,9 +50,9 @@ public class ClientMessageHandlerCallable implements Callable {
                 // LOG.info("Received AppendEntries message from " + message.getLeaderId() + " seq :" + message.getSeqId());
                 peerClient.setLeaderHeartBeatTs(System.currentTimeMillis());
                 boolean entryResult = true ;
-                LogEntry e = message.getLogEntry() ;
+                LogEntryWithIndex e = message.getLogEntry() ;
 
-                entryResult = peerClient.processLogEntry(e,message.getPrevIndex(),message.getLeaderCommitIndex()) ;
+                entryResult = peerClient.processLogEntry(e,message.getPrevIndex(),message.getTerm(), message.getLeaderCommitIndex()) ;
                 AppendEntriesResponse resp = new AppendEntriesResponse(message.getSeqId(), 1, entryResult);
                 ByteBuffer b = resp.serialize();
                 peerClient.queueSendMessage(b);

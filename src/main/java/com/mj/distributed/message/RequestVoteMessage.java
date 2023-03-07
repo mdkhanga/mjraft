@@ -1,6 +1,6 @@
 package com.mj.distributed.message;
 
-import com.mj.distributed.model.LogEntry;
+import com.mj.distributed.model.LogEntryWithIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,14 +15,14 @@ public class RequestVoteMessage implements Message {
     // private int candidateId;
     private String candidateHost ;
     private int candidatePort ;
-    private LogEntry lastCommittedLogEntry ;
+    private LogEntryWithIndex lastCommittedLogEntry ;
 
     private static Logger LOG  = LoggerFactory.getLogger(RequestVoteMessage.class) ;
 
     public RequestVoteMessage(int term,
                               String host,
                               int port,
-                              LogEntry lastLogEntry) {
+                              LogEntryWithIndex lastLogEntry) {
         this.term = term ;
         this.candidateHost = host;
         this.candidatePort = port;
@@ -37,7 +37,7 @@ public class RequestVoteMessage implements Message {
 
     public int getCandidatePort() { return candidatePort; }
 
-    public LogEntry getCommittedLastLogEntry() { return lastCommittedLogEntry; }
+    public LogEntryWithIndex getCommittedLastLogEntry() { return lastCommittedLogEntry; }
 
 
     /**
@@ -97,7 +97,7 @@ public class RequestVoteMessage implements Message {
         byte[] logEntryBytes = new byte[logEntrySize];
         readBuffer.get(logEntryBytes, 0, logEntrySize);
 
-        LogEntry entry = LogEntry.fromBytes(logEntryBytes);
+        LogEntryWithIndex entry = LogEntryWithIndex.fromBytes(logEntryBytes);
 
         return new RequestVoteMessage(
                 term,
