@@ -29,18 +29,6 @@ public class PeerData {
         return seq.incrementAndGet() ;
     }
 
-
-    /* public void addToSeqIdIndexMap(AppendEntriesMessage amsg) {
-
-        LogEntry e = amsg.getLogEntry();
-
-        if (e != null) {
-            // LOG.info("Putting inseq id Map") ;
-            seqIdLogIndexMap.put(amsg.getSeqId(), e.getIndex());
-        }
-
-    } */
-
     public String getHostString() {
         return hostString ;
     }
@@ -71,13 +59,13 @@ public class PeerData {
         return -1 ;
     }
 
-    /* public int getIndexAcked(int seqId) {
-        return seqIdLogIndexMap.getOrDefault(seqId, -1);
-    } */
-
-
     public int getServerId() {
         return serverId;
+    }
+
+    // needed to consistency check if peer is out of data out of sync with leades
+    public void decrementNextIndexToReplicate() {
+        --lastIndexReplicated;
     }
 
 }

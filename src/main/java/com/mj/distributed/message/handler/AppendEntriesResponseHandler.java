@@ -15,8 +15,6 @@ public class AppendEntriesResponseHandler implements MessageHandler {
     public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
 
         AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
-        // PeerData d = peerServer.getPeerData(socketChannel);
-        // int index = d.getIndexAcked(message.getSeqOfMessageAcked());
         int index = message.getIndexAcked();
 
 

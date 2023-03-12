@@ -40,7 +40,6 @@ public class Leader implements State, Runnable {
 
                     try {
 
-
                         server.sendAppendEntriesMessage(v);
 
                         if (count.get() % 60 == 0) {

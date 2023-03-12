@@ -277,6 +277,7 @@ public class PeerServer implements NioListenerConsumer {
                 ret = false ;
             }
         }
+        // Should we commit if there is no entry in message. is consistency check skipped ?
         if (lastComittedIndex < rlog.size() && lastComittedIndex > this.lastComittedIndex.get()) {
             LOG.info("Setting committed index to "+lastComittedIndex);
             this.lastComittedIndex.set(lastComittedIndex);
