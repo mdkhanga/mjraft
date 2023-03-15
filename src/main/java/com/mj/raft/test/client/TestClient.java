@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-// Not thread safe
+// Not thread safe xx
 public class TestClient implements NioCallerConsumer {
 
     private final String hostString;
