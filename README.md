@@ -7,6 +7,7 @@ Java implementation of the raft protocol as described by the paper https://raft.
 - Client API to submit log entries
 - Embeddable into your distributed application
 - Redirect to leader from follower/candidate
+- Consistency check
 
 ## Usage
 ### Building the code
