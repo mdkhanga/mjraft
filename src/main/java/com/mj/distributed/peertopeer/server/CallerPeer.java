@@ -39,11 +39,4 @@ public class CallerPeer implements Peer {
 
     }
 
-   /* public ByteBuffer peekMessageQueue() {
-        return null;
-    }
-
-    public ByteBuffer getNextQueuedMessage() {
-        return null ;
-    } */
 }

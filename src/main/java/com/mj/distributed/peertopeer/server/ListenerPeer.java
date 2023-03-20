@@ -21,8 +21,6 @@ public class ListenerPeer implements Peer {
     }
 
     public void queueSendMessage(Message m) throws Exception {
-
-        // writeQueue.add(m.serialize()) ;
         nioListener.queueSendMessage(socketChannel, m.serialize());
     }
 
