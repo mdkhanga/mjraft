@@ -28,17 +28,13 @@ public class AppendEntriesMessage implements Message {
 
     private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesMessage.class);
 
-    public AppendEntriesMessage(String leaderId, int seqId) {
-        this.leaderId = leaderId;
-        this.seqId = seqId;
-    }
-
-    public AppendEntriesMessage(int term, String leaderId, int seqId, int prevIndex, int leaderCommitIndex) {
+    public AppendEntriesMessage(int term, String leaderId, int seqId, int prevIndex, int prevTerm, int leaderCommitIndex) {
 
         this.term = term;
         this.leaderId = leaderId;
         this.seqId = seqId;
         this.prevIndex = prevIndex;
+        this.prevTerm = prevTerm;
         this.leaderCommitIndex = leaderCommitIndex;
     }
 
@@ -92,6 +88,7 @@ public class AppendEntriesMessage implements Message {
         d.write(leaderBytes);
         d.writeInt(seqId);
         d.writeInt(prevIndex);
+        d.writeInt(prevTerm);
         d.writeInt(leaderCommitIndex);
 
         // LOG.info("Ser Entries size "+ entries.size());
@@ -135,9 +132,10 @@ public class AppendEntriesMessage implements Message {
         String leaderId = new String(leaderBytes);
         int seqId = b.getInt();
         int prevIndex = b.getInt();
+        int prevTerm = b.getInt();
         int leaderCommitIndex = b.getInt();
 
-        AppendEntriesMessage newMsg = new AppendEntriesMessage(term, leaderId, seqId, prevIndex, leaderCommitIndex);
+        AppendEntriesMessage newMsg = new AppendEntriesMessage(term, leaderId, seqId, prevIndex, prevTerm, leaderCommitIndex);
 
         int numEntries = b.getInt() ;
        while (numEntries > 0) {

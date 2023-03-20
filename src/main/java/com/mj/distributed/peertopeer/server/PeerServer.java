@@ -353,9 +353,14 @@ public class PeerServer implements NioListenerConsumer {
     public void sendAppendEntriesMessage(Peer peer) throws Exception {
         Member m = peer.member();
         PeerData v = memberPeerDataMap.get(m);
+
+        int prevIndex = rlog.size()-1;
+        int prevTerm = prevIndex > 0 ? rlog.get(prevIndex).getTerm() : -1;
+
         AppendEntriesMessage p = new AppendEntriesMessage(getTerm(), getServerId(),
                 v.getNextSeq(),
-                rlog.size()-1,
+                prevIndex,
+                prevTerm,
                 lastComittedIndex.get());
 
         int index = getIndexToReplicate(v) ;
