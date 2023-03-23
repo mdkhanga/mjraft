@@ -427,6 +427,13 @@ public class PeerServer implements NioListenerConsumer {
         memberPeerDataMap.put(p.member(), new PeerData(p.member().getHostString(), p.member().getPort()));
     }
 
+    public void decrementNextIndex(SocketChannel sc) {
+        Peer p = socketChannelPeerMap.get(sc);
+        Member m = p.member();
+        PeerData v = memberPeerDataMap.get(m);
+        v.decrementNextIndexToReplicate();
+    }
+
     public void addPeer(SocketChannel sc, String hostString, int port) {
         Member m = new Member(hostString, port, false);
         ListenerPeer l = new ListenerPeer(listener, m, sc) ;

@@ -17,12 +17,16 @@ public class AppendEntriesResponseHandler implements MessageHandler {
         AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
         int index = message.getIndexAcked();
 
+        if (!message.isSuccess()) {
+            // peer rejected the append entry
+            // try the previous one
+            peerServer.decrementNextIndex(socketChannel) ;
+        }
 
         if (index >= 0) {
             // LOG.info("got index for seqId " + message.getSeqOfMessageAcked()) ;
             peerServer.updateIndexAckCount(index);
         }
-
 
     }
 }

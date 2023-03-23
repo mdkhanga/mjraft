@@ -51,7 +51,6 @@ public class AppendEntriesHandler implements MessageHandler {
             index = e.getIndex();
         }
 
-
         AppendEntriesResponse resp = new AppendEntriesResponse(index, peerServer.getTerm(), entryResult);
         ByteBuffer b = resp.serialize();
         peerServer.queueSendMessage(socketChannel, resp);
