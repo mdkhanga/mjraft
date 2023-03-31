@@ -2,6 +2,7 @@ package com.mj.raft.states;
 
 import com.mj.distributed.message.RequestVoteMessage;
 import com.mj.distributed.message.RequestVoteResponseMessage;
+import com.mj.distributed.model.LogEntryWithIndex;
 import com.mj.distributed.model.Member;
 import com.mj.distributed.model.RaftState;
 import com.mj.distributed.peertopeer.server.Peer;
@@ -74,11 +75,16 @@ public class Candidate implements State, Runnable {
 
                     Peer pc = server.getPeer(m);
 
+                    LogEntryWithIndex last = server.getLastEntry();
+                    int lastIndex = last == null ? -1 : last.getIndex();
+                    int lastTerm = last == null ? -1 : last.getTerm();
+
+
                     RequestVoteMessage rv = new RequestVoteMessage(
                             newterm,
                             server.getBindHost(),
                             server.getBindPort(),
-                            server.getLastCommittedEntry());
+                            lastIndex, lastTerm);
                     pc.queueSendMessage(rv);
                 } catch (Exception e) {
                     LOG.error("Error starting client in leader election", e);

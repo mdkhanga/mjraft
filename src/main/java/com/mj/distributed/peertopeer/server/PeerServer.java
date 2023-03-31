@@ -193,6 +193,15 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
+    public LogEntryWithIndex getLastEntry() {
+        if (rlog.size() > 0) {
+            // return new LogEntry(getTerm(),lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
+            LogEntry e = rlog.get(rlog.size()-1);
+            return new LogEntryWithIndex(e.getTerm(), rlog.size()-1, e.getEntry());
+        } else {
+            return null ;
+        }
+    }
 
     public ClusterInfo getClusterInfo() {
             ClusterInfo info ;

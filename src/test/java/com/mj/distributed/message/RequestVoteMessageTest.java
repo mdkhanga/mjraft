@@ -17,7 +17,7 @@ public class RequestVoteMessageTest {
                 3,
                 "192.168.5.21",
                 5050,
-                new LogEntryWithIndex(3, 33, 74)
+                33,3
         );
 
         ByteBuffer b = requestVoteMessage.serialize();
@@ -25,8 +25,7 @@ public class RequestVoteMessageTest {
         RequestVoteMessage readMessage = RequestVoteMessage.deserialize(b) ;
 
         assertTrue(3 == readMessage.getTerm());
-        assertTrue(33 == readMessage.getCommittedLastLogEntry().getIndex());
-        assertTrue(74 == ByteBuffer.wrap(readMessage.getCommittedLastLogEntry().getEntry()).getInt());
+        assertTrue(33 == readMessage.getLastLogIndex());
 
     }
 }

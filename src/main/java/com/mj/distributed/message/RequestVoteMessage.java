@@ -15,18 +15,22 @@ public class RequestVoteMessage implements Message {
     // private int candidateId;
     private String candidateHost ;
     private int candidatePort ;
-    private LogEntryWithIndex lastCommittedLogEntry ;
+    // private LogEntryWithIndex lastCommittedLogEntry ;
+    private int lastLogIndex;
+    private int lastLogTerm;
 
     private static Logger LOG  = LoggerFactory.getLogger(RequestVoteMessage.class) ;
 
     public RequestVoteMessage(int term,
                               String host,
                               int port,
-                              LogEntryWithIndex lastLogEntry) {
+                              int lastLogIndex,
+                              int lastLogTerm) {
         this.term = term ;
         this.candidateHost = host;
         this.candidatePort = port;
-        this.lastCommittedLogEntry = lastLogEntry;
+        this.lastLogIndex = lastLogIndex;
+        this.lastLogTerm = lastLogTerm;
     }
 
     public int getTerm() {
@@ -37,7 +41,13 @@ public class RequestVoteMessage implements Message {
 
     public int getCandidatePort() { return candidatePort; }
 
-    public LogEntryWithIndex getCommittedLastLogEntry() { return lastCommittedLogEntry; }
+    public int getLastLogTerm() {
+        return lastLogTerm;
+    }
+
+    public int getLastLogIndex() {
+        return lastLogIndex;
+    }
 
 
     /**
@@ -56,9 +66,8 @@ public class RequestVoteMessage implements Message {
         d.writeInt(hostStringBytes.length);
         d.write(hostStringBytes);
         d.writeInt(candidatePort);
-        byte[] logEntryBytes = lastCommittedLogEntry.toBytes() ;
-        d.writeInt(logEntryBytes.length);
-        d.write(logEntryBytes);
+        d.writeInt(lastLogIndex);
+        d.writeInt(lastLogTerm);
 
         byte[] requestVoteMsgArray = b.toByteArray();
 
@@ -91,19 +100,17 @@ public class RequestVoteMessage implements Message {
         readBuffer.get(hostStringBytes,0,hostStringSize) ;
         String hostString = new String(hostStringBytes, "UTF-8") ;
 
-        int port = readBuffer.getInt() ;
+        int port = readBuffer.getInt();
+        int lastindex = readBuffer.getInt() ;
 
-        int logEntrySize = readBuffer.getInt() ;
-        byte[] logEntryBytes = new byte[logEntrySize];
-        readBuffer.get(logEntryBytes, 0, logEntrySize);
-
-        LogEntryWithIndex entry = LogEntryWithIndex.fromBytes(logEntryBytes);
+        int lastterm = readBuffer.getInt() ;
 
         return new RequestVoteMessage(
                 term,
                 hostString,
                 port,
-                entry) ;
+                lastindex,
+                lastterm) ;
     }
 
 }
