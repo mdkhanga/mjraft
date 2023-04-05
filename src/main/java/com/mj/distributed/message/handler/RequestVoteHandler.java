@@ -3,6 +3,7 @@ package com.mj.distributed.message.handler;
 import com.mj.distributed.message.RequestVoteMessage;
 import com.mj.distributed.message.RequestVoteResponseMessage;
 import com.mj.distributed.message.TestClientHelloResponse;
+import com.mj.distributed.model.LogEntryWithIndex;
 import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,20 @@ public class RequestVoteHandler implements MessageHandler {
 
         int requestVoteTerm = message.getTerm() ;
 
+        LogEntryWithIndex lastEntry = peerServer.getLastEntry();
+
         boolean vote ;
 
-        if (peerServer.isElectionInProgress() && requestVoteTerm <= peerServer.getCurrentElectionTerm()) {
+
+        if ( message.getLastLogIndex() < lastEntry.getIndex() || message.getLastLogTerm() < lastEntry.getTerm()) {
+            vote = false ;
+            LOG.info(peerServer.getServerId() + ": voted No because last Entry of candidate not current " +
+                    " message lastlogIndex =" + message.getLastLogIndex() +
+                    " server lastlogIndex ="+lastEntry.getIndex() +
+                    " message lastLogTerm = " + message.getLastLogTerm() +
+                    " server lastlogterm = " + message.getLastLogTerm());
+        }
+        else if (peerServer.isElectionInProgress() && requestVoteTerm <= peerServer.getCurrentElectionTerm()) {
             vote = false ;
             LOG.info(peerServer.getServerId() + ": voted No because term < current " +
                     " request vote term =" + requestVoteTerm +
@@ -34,14 +46,11 @@ public class RequestVoteHandler implements MessageHandler {
         else if (requestVoteTerm <= peerServer.getTerm()) {
             vote = false;
             LOG.info(peerServer.getServerId() + ": voted No because term < current term "+peerServer.getTerm());
-        } /* else if (peerServer.getRaftState() == RaftState.candidate &&
-                        requestVoteTerm <= peerServer.getTerm()+1 ) {
-                    vote = false;
-                    LOG.info(peerServer.getServerId() + ": voted No because we are candidate");
-                } */
+        }
         else if (requestVoteTerm <= peerServer.getCurrentVotedTerm()) {
             vote = false ;
             LOG.info(peerServer.getServerId() + ": voted No because term < voted term "+peerServer.getCurrentVotedTerm());
+
         } else {
 
             peerServer.setElectionInProgress(message.getTerm(), null);

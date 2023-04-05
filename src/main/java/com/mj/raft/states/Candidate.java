@@ -54,6 +54,9 @@ public class Candidate implements State, Runnable {
         electionStartTime = System.currentTimeMillis() ;
 
         LOG.info(server.getServerId()+ ":Started leader election at "+ electionStartTime + " for term "+ newterm);
+        LogEntryWithIndex last = server.getLastEntry();
+        int lastIndex = last == null ? -1 : last.getIndex();
+        int lastTerm = last == null ? -1 : last.getTerm();
 
         synchronized (members) {
             members.forEach((m) -> {
@@ -69,16 +72,10 @@ public class Candidate implements State, Runnable {
                         return ;
                     }
 
-
                     LOG.info(server.getServerId() +":Sending request vote message to "+m.getHostString()+":"+m.getPort()) ;
 
 
                     Peer pc = server.getPeer(m);
-
-                    LogEntryWithIndex last = server.getLastEntry();
-                    int lastIndex = last == null ? -1 : last.getIndex();
-                    int lastTerm = last == null ? -1 : last.getTerm();
-
 
                     RequestVoteMessage rv = new RequestVoteMessage(
                             newterm,
