@@ -17,7 +17,7 @@ public class RaftClientAppendEntryHandler implements MessageHandler {
 
         LOG.info(peerServer.getServerId()+":Received a RaftClientAppendEntry message");
         RaftClientAppendEntry message = RaftClientAppendEntry.deserialize(readBuffer.rewind());
-        peerServer.addLogEntry(message.getValue());
+        peerServer.addLogEntry(peerServer.getTerm(), message.getValue());
 
     }
 }

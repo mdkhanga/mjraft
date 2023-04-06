@@ -182,16 +182,6 @@ public class PeerServer implements NioListenerConsumer {
         return m;
     }
 
-    public LogEntryWithIndex getLastCommittedEntry() {
-        if (lastComittedIndex.get() >= 0) {
-            // return new LogEntry(getTerm(),lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
-            int index = lastComittedIndex.get();
-            LogEntry e = rlog.get(index);
-            return new LogEntryWithIndex(getTerm(), index, e.getEntry());
-        } else {
-            return new LogEntryWithIndex(getTerm(), lastComittedIndex.get(), new byte[1]);
-        }
-    }
 
     public LogEntryWithIndex getLastEntry() {
         if (rlog.size() > 0) {
@@ -279,7 +269,7 @@ public class PeerServer implements NioListenerConsumer {
                 if (prevIndex > 0 && rlog.get(prevIndex).getTerm() != prevTerm) {
                     ret = false ;
                 } else {
-                    addLogEntry(data);
+                    addLogEntry(e.getTerm(), data);
                     ret = true;
                     if (lastComittedIndex <= expectedNextEntry) { // do we need this ?
                         this.lastComittedIndex.set(lastComittedIndex);
@@ -340,9 +330,9 @@ public class PeerServer implements NioListenerConsumer {
         removePeer(s);
     }
 
-    public void addLogEntry(byte[] value) throws Exception {
+    public void addLogEntry(int term, byte[] value) throws Exception {
         // rlog.add(value);
-        rlog.add(new LogEntry(getTerm(), value));
+        rlog.add(new LogEntry(term, value));
     }
 
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
