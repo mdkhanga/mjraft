@@ -24,7 +24,7 @@ public class RequestVoteHandler implements MessageHandler {
 
         int requestVoteTerm = message.getTerm() ;
 
-        LogEntryWithIndex lastEntry = peerServer.getLastEntry();
+        LogEntryWithIndex lastEntry = peerServer.getRaftLog().getLastEntry();
 
         boolean vote ;
 

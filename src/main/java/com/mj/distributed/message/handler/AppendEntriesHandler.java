@@ -44,7 +44,7 @@ public class AppendEntriesHandler implements MessageHandler {
         LogEntryWithIndex e = message.getLogEntry() ;
 
         // rule 2 return false if prev entry does not match
-        entryResult = peerServer.processLogEntry(e,message.getPrevIndex(), message.getTerm(), message.getLeaderCommitIndex()) ;
+        entryResult = peerServer.getRaftLog().processLogEntry(e,message.getPrevIndex(), message.getTerm(), message.getLeaderCommitIndex()) ;
 
         int index = -1;
         if (e != null) {

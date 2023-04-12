@@ -20,7 +20,7 @@ public class GetServerLogHandler implements MessageHandler {
 
         GetServerLog message = GetServerLog.deserialize(readBuffer.rewind());
 
-        List<byte[]> ret = peerServer.getLogEntries(message.getStartIndex(), message.getCount());
+        List<byte[]> ret = peerServer.getRaftLog().getLogEntries(message.getStartIndex(), message.getCount());
 
         GetServerLogResponse response = new GetServerLogResponse(message.getSeqId(), ret);
 

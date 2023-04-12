@@ -69,7 +69,7 @@ public class PeerClient implements NioCallerConsumer {
 
     public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
 
-        return peerServer.processLogEntry(e, prevIndex, prevTerm, lastComittedIndex);
+        return peerServer.getRaftLog().processLogEntry(e, prevIndex, prevTerm, lastComittedIndex);
     }
 
     public void setLeaderHeartBeatTs(long ts) {

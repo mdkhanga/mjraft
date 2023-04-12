@@ -54,7 +54,7 @@ public class Candidate implements State, Runnable {
         electionStartTime = System.currentTimeMillis() ;
 
         LOG.info(server.getServerId()+ ":Started leader election at "+ electionStartTime + " for term "+ newterm);
-        LogEntryWithIndex last = server.getLastEntry();
+        LogEntryWithIndex last = server.getRaftLog().getLastEntry();
         int lastIndex = last == null ? -1 : last.getIndex();
         int lastTerm = last == null ? -1 : last.getTerm();
 

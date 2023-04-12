@@ -8,6 +8,7 @@ import com.mj.distributed.message.ClusterInfoMessage;
 import com.mj.distributed.message.HelloMessage;
 import com.mj.distributed.message.Message;
 import com.mj.distributed.utils.Utils;
+import com.mj.raft.log.RaftLog;
 import com.mj.raft.states.Candidate;
 import com.mj.raft.states.Follower;
 import com.mj.raft.states.Leader;
@@ -41,8 +42,9 @@ public class PeerServer implements NioListenerConsumer {
 
     public InBoundMessageCreator inBoundMessageCreator;
 
-    List<LogEntry> rlog = Collections.synchronizedList(new ArrayList<>());
-    volatile AtomicInteger lastComittedIndex  = new AtomicInteger(-1) ;
+    //List<LogEntry> rlog = Collections.synchronizedList(new ArrayList<>());
+    // volatile AtomicInteger lastComittedIndex  = new AtomicInteger(-1) ;
+    RaftLog raftLog = new RaftLog();
 
     volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
             new ConcurrentHashMap<>(); // key = index, value = queue of commit responses
@@ -182,7 +184,7 @@ public class PeerServer implements NioListenerConsumer {
         return m;
     }
 
-
+    /*
     public LogEntryWithIndex getLastEntry() {
         if (rlog.size() > 0) {
             // return new LogEntry(getTerm(),lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
@@ -194,7 +196,7 @@ public class PeerServer implements NioListenerConsumer {
         } else {
             return null ;
         }
-    }
+    } */
 
     public ClusterInfo getClusterInfo() {
             ClusterInfo info ;
@@ -257,7 +259,7 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-
+    /*
     public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
         boolean ret = true ;
         if (e != null) {
@@ -287,6 +289,8 @@ public class PeerServer implements NioListenerConsumer {
         return ret ;
     }
 
+
+
     public List<byte[]> getLogEntries(int start, int count) {
         LOG.info("start = " + start + " count = " + count) ;
         ArrayList<byte[]> ret = new ArrayList<>();
@@ -296,7 +300,7 @@ public class PeerServer implements NioListenerConsumer {
             ret.add(rlog.get(i).getEntry());
         }
         return ret ;
-    }
+    } */
 
     public static void main(String args[]) throws Exception {
         if (args.length == 0 ) {
@@ -330,10 +334,10 @@ public class PeerServer implements NioListenerConsumer {
         removePeer(s);
     }
 
-    public void addLogEntry(int term, byte[] value) throws Exception {
+    /*  public void addLogEntry(int term, byte[] value) throws Exception {
         // rlog.add(value);
         rlog.add(new LogEntry(term, value));
-    }
+    } */
 
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
         inBoundMessageCreator.submit(s, b, numBytes);
@@ -354,6 +358,9 @@ public class PeerServer implements NioListenerConsumer {
 
     public void sendAppendEntriesMessage(Peer peer) throws Exception {
         Member m = peer.member();
+        PeerData v = memberPeerDataMap.get(m);
+        raftLog.sendAppendEntriesMessage(peer, v, getServerId(), getTerm());
+        /*Member m = peer.member();
         PeerData v = memberPeerDataMap.get(m);
 
         int prevIndex = rlog.size()-1;
@@ -378,7 +385,7 @@ public class PeerServer implements NioListenerConsumer {
         // Questionable code -- need to check if q already exists
         ConcurrentLinkedQueue<Integer> q = new ConcurrentLinkedQueue<Integer>();
         q.add(1); // self
-        ackCountMap.put(index, q);
+        ackCountMap.put(index, q); */
     }
 
     public void sendClusterInfoMessage(Peer peer) throws Exception {
@@ -488,27 +495,18 @@ public class PeerServer implements NioListenerConsumer {
 
     }
 
-    public void logRlog() throws Exception {
-        StringBuilder sb = new StringBuilder("Replicated Log [") ;
-        rlog.forEach((k)->{
-            try {
-                sb.append(ByteBuffer.wrap(k.getEntry())) ;
-                sb.append(",") ;
-            } catch(Exception e) {
-                LOG.error("Error getting remote address ",e) ;
-            }
-        });
-        sb.append("]") ;
-        LOG.info(sb.toString()) ;
+    public RaftLog getRaftLog() {
+        return raftLog;
     }
 
-    private int getIndexToReplicate(PeerData d) {
+    /* private int getIndexToReplicate(PeerData d) {
         int maxIndex = rlog.size() - 1  ;
         return d.getNextIndexToReplicate(maxIndex) ;
-    }
+    } */
 
     public void updateIndexAckCount(int index) {
-        if (lastComittedIndex.get() >= index) {
+        raftLog.updateIndexAckCount(index, members.size());
+        /*if (lastComittedIndex.get() >= index) {
             ackCountMap.remove(index);
         }
         ConcurrentLinkedQueue<Integer> indexQueue = ackCountMap.get(index) ;
@@ -521,7 +519,7 @@ public class PeerServer implements NioListenerConsumer {
             lastComittedIndex.set(index) ;
             ackCountMap.remove(index) ;
             LOG.info("Last committed index="+lastComittedIndex.get());
-        }
+        }*/
     }
 
     public State getStateMachine(RaftState raftState) {
