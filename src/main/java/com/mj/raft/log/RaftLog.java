@@ -10,6 +10,8 @@ import com.mj.distributed.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,9 +29,22 @@ public class RaftLog {
     volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
             new ConcurrentHashMap<>(); // key = index, value = queue of commit responses
 
+    File raftLogFile = new File("raftlog.dat");
 
     public RaftLog() {
 
+        if (!raftLogFile.exists()) {
+            try {
+                raftLogFile.createNewFile();
+            } catch(IOException io) {
+                LOG.warn("Error creating raftlog.dat. Log will not be persisted", io);
+            }
+        }
+
+    }
+
+    public void load() {
+        
     }
 
     public LogEntryWithIndex getLastEntry() {
@@ -135,10 +150,17 @@ public class RaftLog {
         indexQueue.add(1) ;
         int majority = Utils.majority(clustersize);
         if (indexQueue.size() >= majority ) {
-            lastComittedIndex.set(index) ;
+            commit(index);
+            /* lastComittedIndex.set(index) ;
             ackCountMap.remove(index) ;
-            LOG.info("Last committed index="+lastComittedIndex.get());
+            LOG.info("Last committed index="+lastComittedIndex.get());*/
         }
     }
 
+    private void commit(int index) {
+        lastComittedIndex.set(index) ;
+        ackCountMap.remove(index) ;
+        // TODO : persist to file
+        LOG.info("Last committed index="+lastComittedIndex.get());
+    }
 }
