@@ -44,7 +44,7 @@ public class RaftLog {
     }
 
     public void load() {
-        
+
     }
 
     public LogEntryWithIndex getLastEntry() {
