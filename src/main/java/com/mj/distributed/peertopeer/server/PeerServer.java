@@ -42,8 +42,6 @@ public class PeerServer implements NioListenerConsumer {
 
     public InBoundMessageCreator inBoundMessageCreator;
 
-    //List<LogEntry> rlog = Collections.synchronizedList(new ArrayList<>());
-    // volatile AtomicInteger lastComittedIndex  = new AtomicInteger(-1) ;
     RaftLog raftLog = new RaftLog();
 
     volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
@@ -184,19 +182,6 @@ public class PeerServer implements NioListenerConsumer {
         return m;
     }
 
-    /*
-    public LogEntryWithIndex getLastEntry() {
-        if (rlog.size() > 0) {
-            // return new LogEntry(getTerm(),lastComittedIndex.get(),rlog.get(lastComittedIndex.get()));
-            synchronized (rlog) {
-                int index = rlog.size() - 1;
-                LogEntry e = rlog.get(index);
-                return new LogEntryWithIndex(e.getTerm(), index, e.getEntry());
-            }
-        } else {
-            return null ;
-        }
-    } */
 
     public ClusterInfo getClusterInfo() {
             ClusterInfo info ;
@@ -259,49 +244,6 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    /*
-    public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
-        boolean ret = true ;
-        if (e != null) {
-            byte[] data = e.getEntry();
-            int expectedNextEntry = rlog.size();
-
-            // rule 2
-            if (prevIndex + 1 == expectedNextEntry) {
-                if (prevIndex > 0 && rlog.get(prevIndex).getTerm() != prevTerm) {
-                    ret = false ;
-                } else {
-                    addLogEntry(e.getTerm(), data);
-                    ret = true;
-                    if (lastComittedIndex <= expectedNextEntry) { // do we need this ?
-                        this.lastComittedIndex.set(lastComittedIndex);
-                    }
-                }
-            } else {
-                ret = false ;
-            }
-        }
-        // Should we commit if there is no entry in message. is consistency check skipped ?
-        if (lastComittedIndex < rlog.size() && lastComittedIndex > this.lastComittedIndex.get()) {
-            LOG.info("Setting committed index to "+lastComittedIndex);
-            this.lastComittedIndex.set(lastComittedIndex);
-        }
-        return ret ;
-    }
-
-
-
-    public List<byte[]> getLogEntries(int start, int count) {
-        LOG.info("start = " + start + " count = " + count) ;
-        ArrayList<byte[]> ret = new ArrayList<>();
-        int end = start + count < rlog.size() ? start + count - 1 : rlog.size() -1 ;
-        LOG.info("end = " + end);
-        for (int i = start; i <= end ; i++) {
-            ret.add(rlog.get(i).getEntry());
-        }
-        return ret ;
-    } */
-
     public static void main(String args[]) throws Exception {
         if (args.length == 0 ) {
             System.out.println("Need at least 1 argurment") ;
@@ -334,11 +276,6 @@ public class PeerServer implements NioListenerConsumer {
         removePeer(s);
     }
 
-    /*  public void addLogEntry(int term, byte[] value) throws Exception {
-        // rlog.add(value);
-        rlog.add(new LogEntry(term, value));
-    } */
-
     public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
         inBoundMessageCreator.submit(s, b, numBytes);
     }
@@ -360,32 +297,6 @@ public class PeerServer implements NioListenerConsumer {
         Member m = peer.member();
         PeerData v = memberPeerDataMap.get(m);
         raftLog.sendAppendEntriesMessage(peer, v, getServerId(), getTerm());
-        /*Member m = peer.member();
-        PeerData v = memberPeerDataMap.get(m);
-
-        int prevIndex = rlog.size()-1;
-        int prevTerm = prevIndex > 0 ? rlog.get(prevIndex).getTerm() : -1;
-
-        AppendEntriesMessage p = new AppendEntriesMessage(getTerm(), getServerId(),
-                v.getNextSeq(),
-                prevIndex,
-                prevTerm,
-                lastComittedIndex.get());
-
-        int index = getIndexToReplicate(v) ;
-        if (index >= 0 && index < rlog.size()) {
-            byte[] data = rlog.get(index).getEntry();
-            // LOG.info("Replicating ..." + ByteBuffer.wrap(data).getInt());
-            LogEntryWithIndex entry = new LogEntryWithIndex(getTerm(),index, data);
-            p.addLogEntry(entry);
-            p.setPrevIndex(index-1);
-        }
-        // v.addToSeqIdIndexMap(p); Not being used
-        peer.queueSendMessage(p);
-        // Questionable code -- need to check if q already exists
-        ConcurrentLinkedQueue<Integer> q = new ConcurrentLinkedQueue<Integer>();
-        q.add(1); // self
-        ackCountMap.put(index, q); */
     }
 
     public void sendClusterInfoMessage(Peer peer) throws Exception {
@@ -499,27 +410,9 @@ public class PeerServer implements NioListenerConsumer {
         return raftLog;
     }
 
-    /* private int getIndexToReplicate(PeerData d) {
-        int maxIndex = rlog.size() - 1  ;
-        return d.getNextIndexToReplicate(maxIndex) ;
-    } */
 
     public void updateIndexAckCount(int index) {
         raftLog.updateIndexAckCount(index, members.size());
-        /*if (lastComittedIndex.get() >= index) {
-            ackCountMap.remove(index);
-        }
-        ConcurrentLinkedQueue<Integer> indexQueue = ackCountMap.get(index) ;
-        if (indexQueue == null) {
-            return ;
-        }
-        indexQueue.add(1) ;
-        int majority = Utils.majority(members.size());
-        if (indexQueue.size() >= majority ) {
-            lastComittedIndex.set(index) ;
-            ackCountMap.remove(index) ;
-            LOG.info("Last committed index="+lastComittedIndex.get());
-        }*/
     }
 
     public State getStateMachine(RaftState raftState) {
