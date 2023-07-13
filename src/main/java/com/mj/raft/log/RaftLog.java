@@ -33,19 +33,10 @@ public class RaftLog {
 
     public RaftLog() {
 
-        if (!raftLogFile.exists()) {
-            try {
-                raftLogFile.createNewFile();
-            } catch(IOException io) {
-                LOG.warn("Error creating raftlog.dat. Log will not be persisted", io);
-            }
-        }
+
 
     }
 
-    public void load() {
-
-    }
 
     public LogEntryWithIndex getLastEntry() {
         if (rlog.size() > 0) {
