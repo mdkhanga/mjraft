@@ -11,9 +11,11 @@ public class ServerState {
     private int lastpersistedIndex;
     private Member votedFor;
 
-    public ServerState() {
-
-
+    public ServerState(int c, int lc, int lp, Member m) {
+        currentTerm = c;
+        lastCommittedIndex = lc;
+        lastpersistedIndex = lp;
+        votedFor = m ;
     }
 
     public int getCurrentTerm() {
@@ -68,7 +70,17 @@ public class ServerState {
         return ret ;
     }
 
-    public static ServerState deserialize(ByteBuffer b) {
-        return new ServerState();
+    public static ServerState deserialize(ByteBuffer b) throws IOException {
+
+        int cTerm = b.getInt();
+        int lcIndex = b.getInt();
+        int lpIndex = b.getInt();
+        int vSize = b.getInt();
+
+        byte[] vBytes = new byte[vSize];
+        b.get(vBytes, 0, vSize);
+        Member vFor = Member.fromBytes(vBytes);
+
+        return new ServerState(cTerm, lcIndex, lpIndex, vFor);
     }
 }

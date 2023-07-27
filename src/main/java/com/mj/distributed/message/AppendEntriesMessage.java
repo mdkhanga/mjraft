@@ -82,7 +82,6 @@ public class AppendEntriesMessage implements Message {
         d.writeInt(messageType.value());
         d.writeInt(term);
 
-        // d.writeInt(leaderId);
         byte[] leaderBytes = leaderId.getBytes("UTF-8");
         d.writeInt(leaderBytes.length);
         d.write(leaderBytes);
@@ -91,12 +90,8 @@ public class AppendEntriesMessage implements Message {
         d.writeInt(prevTerm);
         d.writeInt(leaderCommitIndex);
 
-        // LOG.info("Ser Entries size "+ entries.size());
         d.writeInt(entries.size());
         if (entries.size() > 0) {
-
-            // d.writeInt(entries.size());
-
             entries.forEach((e)->{
                 try {
                     byte[] ebytes = e.toBytes();
@@ -118,14 +113,12 @@ public class AppendEntriesMessage implements Message {
 
     public static AppendEntriesMessage deserialize(ByteBuffer b) throws Exception {
         int messagesize = b.getInt() ;
-        // LOG.info("Received message of size " + messagesize) ;
         int type = b.getInt() ;
         if (messageType.value() != type) {
             throw new RuntimeException("Message is not the expected type AppendEntriesMessage") ;
         }
 
         int term = b.getInt();
-        // int leaderId = b.getInt();
         int leaderSize = b.getInt();
         byte[] leaderBytes = new byte[leaderSize];
         b.get(leaderBytes, 0, leaderSize);
