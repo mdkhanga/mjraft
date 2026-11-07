@@ -34,10 +34,24 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(listOf("-Xlint:all", "-Xlint:-serial", "-Xlint:-processing"))
 }
 
-tasks.test {
-    useJUnitPlatform()
+tasks.withType<Test>().configureEach {
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+tasks.test {
+    useJUnitPlatform { excludeTags("cluster") }
+}
+
+val clusterTest by tasks.registering(Test::class) {
+    description = "Runs multi-server cluster tests."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("cluster") }
+    shouldRunAfter(tasks.test)
+}
+
+tasks.check { dependsOn(clusterTest) }

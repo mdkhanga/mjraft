@@ -1,13 +1,18 @@
 package com.mj.distributed.peertopeer.server;
 
-import com.mj.distributed.model.ClusterInfo;
 import com.mj.raft.client.RaftClient;
 import com.mj.raft.test.client.TestClient;
+import com.mj.raft.testutil.Await;
+import com.mj.raft.testutil.Ports;
+import com.mj.raft.testutil.Servers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -15,12 +20,17 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
+@Tag("cluster")
+@Timeout(value = 3, unit = TimeUnit.MINUTES)
 public class MultithreadClientsTest {
 
+    static int[] ports;
     static PeerServer leader;
     static PeerServer server1;
     static PeerServer server2;
@@ -29,22 +39,21 @@ public class MultithreadClientsTest {
 
     @BeforeAll
     public static void init() throws Exception {
-        System.out.println("running init") ;
+        ports = Ports.free(3);
 
-        leader = new PeerServer(5101);
+        leader = new PeerServer(ports[0]);
         leader.start() ;
 
-        String[] seeds = new String[1];
-        seeds[0] = "localhost:5101";
+        String[] seeds = { "localhost:" + ports[0] };
 
-        server1 = new PeerServer(5102, seeds);
+        server1 = new PeerServer(ports[1], seeds);
         server1.start();
 
-        server2 = new PeerServer(5103, seeds);
+        server2 = new PeerServer(ports[2], seeds);
         server2.start();
 
-        Thread.sleep(15000);
-
+        Await.until(Duration.ofSeconds(20), "followers see the initial leader",
+                () -> Servers.allSeeLeader(ports[0], server1, server2));
     }
 
     @AfterAll
@@ -61,29 +70,30 @@ public class MultithreadClientsTest {
 
         CountDownLatch startGate = new CountDownLatch(1) ;
 
+        List<Future<Void>> sends = new ArrayList<>();
         inputs.forEach((t)->{
             TClient tc = new TClient(t, startGate);
-            executorService.submit(tc);
+            sends.add(executorService.submit(tc));
         });
 
         startGate.countDown();
 
-        System.out.println("Connecting to server2") ;
-        TestClient ts = new TestClient("localhost",5102);
+        TestClient ts = new TestClient("localhost",ports[1]);
         ts.connect();
-        System.out.println("Connected to server2") ;
 
-        System.out.println("Connecting to server3") ;
-        TestClient ts2 = new TestClient("localhost",5103);
+        TestClient ts2 = new TestClient("localhost",ports[2]);
         ts2.connect();
-        System.out.println("Connected to server3") ;
 
-        System.out.println("Connecting to server1");
-        TestClient ts0 = new TestClient("localhost",5101);
+        TestClient ts0 = new TestClient("localhost",ports[0]);
         ts0.connect();
-        System.out.println("Connected to server1") ;
 
-        Thread.sleep(15000);
+        // surface any client-side failure
+        for (Future<Void> f : sends) {
+            f.get(30, TimeUnit.SECONDS);
+        }
+
+        Await.until(Duration.ofSeconds(30), "all servers have 10 log entries",
+                () -> Servers.allHaveLogSize(inputs.size(), leader, server1, server2));
 
         for (int i = 0 ; i < 10 ; i++) {
 
@@ -99,11 +109,10 @@ public class MultithreadClientsTest {
 
             assertEquals(server3Ints.get(0), server2Ints.get(0) );
             assertEquals(server0Ints.get(0), server2Ints.get(0) );
-            System.out.println(server2Ints.get(0));
 
         }
 
-
+        executorService.shutdown();
 
     }
 
@@ -137,7 +146,7 @@ public class MultithreadClientsTest {
 
             startGate.await() ;
 
-            RaftClient raftClient = new RaftClient("localhost", 5101);
+            RaftClient raftClient = new RaftClient("localhost", ports[0]);
             raftClient.connect();
 
             raftClient.send(val);

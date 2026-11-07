@@ -3,199 +3,157 @@ package com.mj.distributed.peertopeer.server;
 import com.mj.distributed.model.ClusterInfo;
 import com.mj.raft.client.RaftClient;
 import com.mj.raft.test.client.TestClient;
+import com.mj.raft.testutil.Await;
+import com.mj.raft.testutil.Ports;
+import com.mj.raft.testutil.Servers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
-import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
+@Tag("cluster")
+@Timeout(value = 4, unit = TimeUnit.MINUTES)
 public class LeaderElection5ServerTest {
 
-    static PeerServer server1;
-    static PeerServer server2;
-    static PeerServer server3;
-    static PeerServer server4;
-    static PeerServer server5;
+    static int[] ports;
 
-    static Set<Integer> alive = new HashSet<>() ;
+    // port -> running server
+    static final Map<Integer, PeerServer> alive = new LinkedHashMap<>();
 
     @BeforeAll
     public static void init() throws Exception {
-        System.out.println("running init");
+        ports = Ports.free(5);
 
-        server1 = new PeerServer(7001);
-        server1.start();
-        alive.add(7001);
+        PeerServer first = new PeerServer(ports[0]);
+        first.start();
+        alive.put(ports[0], first);
 
-        String[] seeds = new String[1];
-        seeds[0] = "localhost:7001";
+        String[] seeds = { "localhost:" + ports[0] };
 
-        server2 = new PeerServer(7002, seeds);
-        server2.start();
-        alive.add(7002);
+        for (int i = 1; i < ports.length; i++) {
+            PeerServer s = new PeerServer(ports[i], seeds);
+            s.start();
+            alive.put(ports[i], s);
+        }
 
-        server3 = new PeerServer(7003, seeds);
-        server3.start();
-        alive.add(7003);
+        // followers learn about each other only from the leader's periodic ClusterInfo gossip
+        Await.until(Duration.ofSeconds(30), "all servers see the leader and know every member",
+                () -> Servers.allSeeLeader(ports[0], aliveServers())
+                        && Servers.allKnowMembers(5, aliveServers()));
 
-        server4 = new PeerServer(7004, seeds);
-        server4.start();
-        alive.add(7004);
-
-        server5 = new PeerServer(7005, seeds);
-        server5.start();
-        alive.add(7005);
-
-        Thread.sleep(10000);
-
-        RaftClient raftClient = new RaftClient("localhost", 7001);
+        RaftClient raftClient = new RaftClient("localhost", ports[0]);
         raftClient.connect();
 
         raftClient.send(23);
 
-
-        Thread.sleep(5000);
-
+        // voters reject candidates while their own log is empty, so the entry must replicate first
+        Await.until(Duration.ofSeconds(20), "the entry replicates to all servers",
+                () -> Servers.allHaveLogSize(1, aliveServers()));
     }
 
 
     @AfterAll
     public static void destroy() throws Exception {
-
-        /*server3.stop();
-        server3 = null;
-        server4.stop();
-        server4 = null;
-        server5.stop();
-        server5 = null;*/
-        alive.forEach(i-> {
+        for (PeerServer p : alive.values()) {
             try {
-                PeerServer p = getServerForLeader(i);
                 p.stop();
             } catch(Exception e) {
                 System.out.println(e);
             }
-        });
+        }
     }
 
     @Test
     public void leaderElectionOn2Failure() throws Exception {
 
 
-        TestClient ts = new TestClient("localhost", 7002);
+        TestClient ts = new TestClient("localhost", ports[1]);
         ts.connect();
         ClusterInfo cs1 = ts.getClusterInfo();
-        assertEquals(cs1.getLeader().getPort(), 7001);
-        assertEquals(cs1.getLeader().getHostString(), "localhost");
+        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals("localhost", cs1.getLeader().getHostString());
 
 
-        TestClient ts2 = new TestClient("localhost", 7003);
+        TestClient ts2 = new TestClient("localhost", ports[2]);
         ts2.connect();
         cs1 = ts2.getClusterInfo();
-        assertEquals(cs1.getLeader().getPort(), 7001);
-        assertEquals(cs1.getLeader().getHostString(), "localhost");
+        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals("localhost", cs1.getLeader().getHostString());
 
-        System.out.println("Stopping server1");
-        server1.stop();
-        alive.remove(7001);
-        Thread.sleep(35000);
+        stop(ports[0]);
+
+        PeerServer s1 = alive.get(ports[1]);
+        PeerServer s2 = alive.get(ports[2]);
+        Await.until(Duration.ofSeconds(60), "servers agree on a new leader after the first failure",
+                () -> alive.containsKey(Servers.leaderPort(s1))
+                        && s1.getLeader().equals(s2.getLeader()));
 
         // check for new leader
-        System.out.println("Calling getClusterInfo 7003") ;
         cs1 = ts2.getClusterInfo();
-        System.out.println("returned getClusterInfo 7003") ;
-        int port = cs1.getLeader().getPort();
-        System.out.println("mj leader is " + cs1.getLeader().getHostString() + ":" + port);
+        assertNotEquals(ports[0], cs1.getLeader().getPort());
 
-        if (port == 7001) {
-            assertTrue(false);
-        }
-
-
-        System.out.println("Calling getClusterInfo 7002") ;
         ClusterInfo cs2 = ts.getClusterInfo();
-        System.out.println("returned getClusterInfo 7002") ;
-        System.out.println("mj leader is " + cs2.getLeader().getHostString() + ":" + cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getHostString(), cs2.getLeader().getHostString());
 
-        // repeat
-        Thread.sleep(5000);
+        // repeat after a pause to check the leader is stable
+        Thread.sleep(1000);
 
-        System.out.println("2 Calling getClusterInfo 7003") ;
         cs1 = ts2.getClusterInfo();
-        System.out.println("2 returned getClusterInfo 7003") ;
-        port = cs1.getLeader().getPort();
-        System.out.println("mj leader is " + cs1.getLeader().getHostString() + ":" + port);
+        assertNotEquals(ports[0], cs1.getLeader().getPort());
 
-        if (port == 7001) {
-            assertTrue(false);
-        }
-
-        System.out.println("2 Calling getClusterInfo 7002") ;
         cs2 = ts.getClusterInfo();
-        System.out.println("2 returned getClusterInfo 7002") ;
-        System.out.println("mj leader is " + cs2.getLeader().getHostString() + ":" + cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
         assertEquals(cs1.getLeader().getHostString(), cs2.getLeader().getHostString());
 
-        System.out.println("Stopping server "+cs2.getLeader().getHostString() + ":" + cs2.getLeader().getPort());
-        PeerServer newleader = getServerForLeader(cs2.getLeader().getPort()) ;
-        newleader.stop();
-        alive.remove(cs2.getLeader().getPort());
-        // server2.stop();
-        Thread.sleep(35000);
+        int secondLeader = cs2.getLeader().getPort();
+        stop(secondLeader);
 
-       List<Integer> aliveList = new ArrayList<>(alive);
+        List<Integer> aliveList = new ArrayList<>(alive.keySet());
+        PeerServer a = alive.get(aliveList.get(0));
+        PeerServer b = alive.get(aliveList.get(1));
+        Await.until(Duration.ofSeconds(60), "servers agree on a new leader after the second failure",
+                () -> alive.containsKey(Servers.leaderPort(a))
+                        && a.getLeader().equals(b.getLeader()));
 
-       System.out.println("ts4 trying to connect to " + aliveList.get(0)) ;
         TestClient ts4 = new TestClient("localhost", aliveList.get(0));
         ts4.connect();
-        System.out.println("ts4 connected to " + aliveList.get(0)) ;
         ClusterInfo cs4 = ts4.getClusterInfo();
-        System.out.println("1 mj new leader is " + cs4.getLeader().getHostString() + ":" + cs4.getLeader().getPort());
 
-        System.out.println("ts5 trying to connect to " + aliveList.get(1)) ;
         TestClient ts5 = new TestClient("localhost", aliveList.get(1));
         ts5.connect();
-        System.out.println("ts5 connected to " + aliveList.get(1)) ;
         ClusterInfo cs5 = ts5.getClusterInfo();
-        System.out.println("2 mj new leader is " + cs5.getLeader().getHostString() + ":" + cs5.getLeader().getPort());
 
+        assertTrue(alive.containsKey(cs4.getLeader().getPort()));
         assertEquals(cs4.getLeader().getPort(), cs5.getLeader().getPort());
-        assertEquals(cs4.getLeader().getHostString(), cs4.getLeader().getHostString());
-
-        System.out.println("Done with test");
+        assertEquals(cs4.getLeader().getHostString(), cs5.getLeader().getHostString());
 
 
         ts.close();
         ts2.close();
         ts4.close();
         ts5.close();
-
-        System.out.println("Done calling close");
     }
 
-    private static PeerServer getServerForLeader(int port) {
+    private static void stop(int port) throws Exception {
+        alive.remove(port).stop();
+    }
 
-        if (port == 7002)
-            return server2 ;
-        else if (port == 7003)
-            return server3 ;
-        else if (port == 7004)
-            return server4;
-        else if(port == 7005)
-            return server5;
-        else
-            throw new RuntimeException("unknown server");
+    private static PeerServer[] aliveServers() {
+        return alive.values().toArray(new PeerServer[0]);
     }
 
 }
