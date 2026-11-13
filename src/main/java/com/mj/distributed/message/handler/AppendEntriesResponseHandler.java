@@ -6,13 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class AppendEntriesResponseHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesResponseHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         AppendEntriesResponse message = AppendEntriesResponse.deserialize(readBuffer.rewind());
         int index = message.getIndexAcked();
@@ -20,7 +20,7 @@ public class AppendEntriesResponseHandler implements MessageHandler {
         if (!message.isSuccess()) {
             // peer rejected the append entry
             // try the previous one
-            peerServer.decrementNextIndex(socketChannel) ;
+            peerServer.decrementNextIndex(connection) ;
         }
 
         if (index >= 0) {

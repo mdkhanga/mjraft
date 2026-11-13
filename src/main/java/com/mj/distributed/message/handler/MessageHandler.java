@@ -5,10 +5,10 @@ import com.mj.distributed.peertopeer.server.PeerServer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public interface MessageHandler {
 
-    void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer p) throws Exception;
+    void handle(ByteBuffer readBuffer, Connection connection, PeerServer p) throws Exception;
 
 }

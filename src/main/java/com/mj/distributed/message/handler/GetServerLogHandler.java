@@ -8,14 +8,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 import java.util.List;
 
 public class GetServerLogHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(GetServerLogHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
         LOG.info(peerServer.getServerId()+":Received a GetServerLog message");
 
         GetServerLog message = GetServerLog.deserialize(readBuffer.rewind());
@@ -25,7 +25,7 @@ public class GetServerLogHandler implements MessageHandler {
         GetServerLogResponse response = new GetServerLogResponse(message.getSeqId(), ret);
 
         LOG.info(peerServer.getServerId()+":Sending a GetServerLog response message");
-        peerServer.queueSendMessage(socketChannel, response);
+        peerServer.queueSendMessage(connection, response);
 
 
     }

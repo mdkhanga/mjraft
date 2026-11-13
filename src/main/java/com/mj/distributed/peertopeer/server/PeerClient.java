@@ -1,122 +1,87 @@
 package com.mj.distributed.peertopeer.server;
 
-import com.mj.distributed.model.LogEntryWithIndex;
-import com.mj.distributed.tcp.nio.NioCaller;
-import com.mj.distributed.tcp.nio.NioCallerConsumer;
+import com.mj.distributed.message.Message;
 import com.mj.distributed.model.Member;
-import org.slf4j.LoggerFactory ;
-import org.slf4j.Logger ;
-import java.io.DataOutputStream;
-import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import com.mj.distributed.tcp.Connection;
+import com.mj.distributed.tcp.ConnectionListener;
+import com.mj.distributed.tcp.TcpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.time.Duration;
 
 
 /**
+ * Opens an outbound connection to another server and registers it as a peer.
+ *
  * Created by Manoj Khangaonkar on 10/5/2016.
  */
-public class PeerClient implements NioCallerConsumer {
+public class PeerClient implements ConnectionListener {
 
-    PeerServer peerServer;
-    DataOutputStream dos;
-    Integer peerServerId = -1;
-    int remotePort; // port returned remote initiates the connection - other end of socket after our accept
-    int remoteListenPort; // if we initate connection, this is where we connect to
-    InetAddress remoteIpAddress;
+    private static final Logger LOG = LoggerFactory.getLogger(PeerClient.class);
 
-    String remoteHost;
+    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final long INITIAL_BACKOFF_MS = 100;
+    private static final long MAX_BACKOFF_MS = 2000;
 
-    ExecutorService peerClientExecutor = Executors.newFixedThreadPool(3);
+    private final PeerServer peerServer;
+    private final String remoteHost;
+    private final int remotePort;
 
-    public volatile Queue<ByteBuffer> writeQueue = new ConcurrentLinkedDeque<ByteBuffer>();
-
-
-    Logger LOG = LoggerFactory.getLogger(PeerClient.class);
-
-    private NioCaller nioCaller;
-
-
-    private PeerClient() {
-
-    }
+    private Connection connection;
 
     public PeerClient(String host, int port, PeerServer p) {
-
         this.remoteHost = host;
         this.remotePort = port;
         this.peerServer = p;
-
-
     }
 
-
-    public void start() throws Exception {
-
-        nioCaller = new NioCaller(remoteHost, remotePort,
-                peerServer.getBindHost(),
-                peerServer.getBindPort(), this);
-        nioCaller.start();
-
-        // PeerClientStatusCallable peerClientStatusCallable = new PeerClientStatusCallable();
-        // peerClientExecutor.submit(peerClientStatusCallable);
-
+    /**
+     * Single attempt. On success the peer is registered with the server before this returns.
+     */
+    public void connect() throws IOException {
+        connection = TcpClient.connect(remoteHost, remotePort, CONNECT_TIMEOUT, this);
     }
 
-    public boolean processLogEntry(LogEntryWithIndex e, int prevIndex, int prevTerm, int lastComittedIndex) throws Exception {
-
-        return peerServer.getRaftLog().processLogEntry(e, prevIndex, prevTerm, lastComittedIndex);
-    }
-
-    public void setLeaderHeartBeatTs(long ts) {
-        peerServer.setLastLeaderHeartBeatTs(ts);
-    }
-
-    public void queueSendMessage(ByteBuffer b) {
-        nioCaller.queueSendMessage(b);
-    }
-
-    public void addedConnection(SocketChannel s) {
-        peerServer.addPeer(s, new CallerPeer(new Member(remoteHost, remotePort), this));
-    }
-
-    public void droppedConnection(SocketChannel s) {
-        LOG.info(peerServer.getServerId() + ": a connection dropped");
-        peerServer.removePeer(s);
-    }
-
-    public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
-        peerServer.inBoundMessageCreator.submit(s, b, numBytes);
-    }
-
-
-    @Override
-    public boolean equals(Object obj) {
-
-        if (null == obj) {
-            return false;
+    /**
+     * Retries with exponential backoff until connected or the server is stopped.
+     * Returns false if the server stopped first.
+     */
+    public boolean connectWithRetry() throws InterruptedException {
+        long backoff = INITIAL_BACKOFF_MS;
+        while (!peerServer.isStopped()) {
+            try {
+                connect();
+                return true;
+            } catch (IOException e) {
+                LOG.info(peerServer.getServerId() + ": cannot connect to " + remoteHost + ":" + remotePort
+                        + " (" + e.getMessage() + "), retrying in " + backoff + "ms");
+                Thread.sleep(backoff);
+                backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
+            }
         }
+        return false;
+    }
 
-        if (!(obj instanceof PeerClient)) {
-            return false;
-        }
-
-        return peerServerId.equals(((PeerClient) obj).peerServerId);
-
+    public void queueSendMessage(Message m) throws Exception {
+        connection.send(m.serialize());
     }
 
     @Override
-    public int hashCode() {
-        return peerServerId.hashCode();
+    public void onOpened(Connection c) {
+        peerServer.addPeer(c, new ConnectionPeer(new Member(remoteHost, remotePort), c));
     }
 
-    public String getPeerServer() {
-        return remoteIpAddress.toString() + ":" + remoteListenPort;
+    @Override
+    public void onFrame(Connection c, ByteBuffer frame) {
+        peerServer.onFrame(c, frame);
     }
 
-
+    @Override
+    public void onClosed(Connection c) {
+        LOG.info(peerServer.getServerId() + ": connection to " + remoteHost + ":" + remotePort + " dropped");
+        peerServer.removePeer(c);
+    }
 }

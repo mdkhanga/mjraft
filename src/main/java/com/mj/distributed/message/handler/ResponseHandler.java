@@ -10,13 +10,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class ResponseHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(ResponseHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         Response r = Response.deserialize(readBuffer.rewind()) ;
         if (r.getStatus() == 0 && r.getType() == 1) {
@@ -26,11 +26,11 @@ public class ResponseHandler implements MessageHandler {
             // TODO add delay
             HelloMessage m = new HelloMessage(peerServer.getBindHost(),
                     peerServer.getBindPort());
-            peerServer.queueSendMessage(socketChannel, m);
+            peerServer.queueSendMessage(connection, m);
         } else if (r.getStatus() == 0 && r.getType() == 2 ) {
 
             Redirect rd = Redirect.fromBytes(r.getDetails()) ;
-            peerServer.redirect(socketChannel, rd);
+            peerServer.redirect(connection, rd);
 
         }
 

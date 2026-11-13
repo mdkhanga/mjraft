@@ -1,8 +1,9 @@
 package com.mj.distributed.peertopeer.server;
 
 import com.mj.distributed.model.*;
-import com.mj.distributed.tcp.nio.NioListener;
-import com.mj.distributed.tcp.nio.NioListenerConsumer;
+import com.mj.distributed.tcp.Connection;
+import com.mj.distributed.tcp.ConnectionListener;
+import com.mj.distributed.tcp.TcpServer;
 import com.mj.distributed.message.AppendEntriesMessage;
 import com.mj.distributed.message.ClusterInfoMessage;
 import com.mj.distributed.message.HelloMessage;
@@ -17,17 +18,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.*;
-import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class PeerServer implements NioListenerConsumer {
-    
+public class PeerServer implements ConnectionListener {
+
     private final ConcurrentMap<Member, Peer> connectedMembersMap = new ConcurrentHashMap<>() ;
     private volatile ConcurrentMap<Member, PeerData> memberPeerDataMap = new ConcurrentHashMap<>() ;
     // reverse index
-    private final ConcurrentMap<SocketChannel, Peer> socketChannelPeerMap = new ConcurrentHashMap<>() ;
+    private final ConcurrentMap<Connection, Peer> connectionPeerMap = new ConcurrentHashMap<>() ;
 
     private Set<Member> members = new HashSet<>() ;
     private volatile Member leader ;
@@ -37,10 +38,8 @@ public class PeerServer implements NioListenerConsumer {
     private String bindHost = "localhost" ;
     private int bindPort ;
 
-    private NioListener listener;
+    private TcpServer tcpServer;
     private Member thisMember ;
-
-    public InBoundMessageCreator inBoundMessageCreator;
 
     RaftLog raftLog = new RaftLog();
 
@@ -52,7 +51,7 @@ public class PeerServer implements NioListenerConsumer {
     // volatile RaftState raftState = RaftState.follower ;
     volatile State raftState ;
     ExecutorService peerServerExecutor = Executors.newFixedThreadPool(6) ;
-    private volatile boolean stop = false ;
+    private final AtomicBoolean stop = new AtomicBoolean(false) ;
     private volatile boolean electionInProgress = false ;
     private volatile int currentElectionTerm = -1 ;
     private volatile Candidate leaderElection ;
@@ -82,7 +81,6 @@ public class PeerServer implements NioListenerConsumer {
         bindPort = port;
         LOG.info("Starting server on port: " + port + " state: "+ state);
         raftState = getStateMachine(state) ;
-        inBoundMessageCreator = new InBoundMessageCreator(this);
     }
 
     public void start() throws Exception {
@@ -91,6 +89,9 @@ public class PeerServer implements NioListenerConsumer {
         leader = thisMember;
         members.add(thisMember);
 
+        // bind first so a port conflict fails start() and peers can reach us while we contact the seeds
+        tcpServer = TcpServer.start(bindHost, bindPort, this);
+
         if (seeds != null) {
             for (String s : seeds) {
 
@@ -98,24 +99,38 @@ public class PeerServer implements NioListenerConsumer {
 
                 LOG.info("Connecting to " + s) ;
                 PeerClient peer = new PeerClient(remoteaddrAndPort[0],Integer.parseInt(remoteaddrAndPort[1]),this);
-                peer.start();
-                HelloMessage m = new HelloMessage(getBindHost(),getBindPort());
-                peer.queueSendMessage(m.serialize());
-                LOG.info("Done write hello to q") ;
+                if (!peer.connectWithRetry()) {
+                    return; // stopped while connecting
+                }
+                peer.queueSendMessage(new HelloMessage(getBindHost(),getBindPort()));
 
             }
         }
         // startStateMachine();
         raftState.start();
-        listener = new NioListener(bindHost, bindPort, this);
-        listener.start();
     }
 
+    /**
+     * Stops the state machine, closes the listening socket and every connection, and shuts down threads.
+     * Safe to call more than once.
+     */
     public void stop() throws Exception {
+        if (!stop.compareAndSet(false, true)) {
+            return;
+        }
         LOG.info(getServerId() + ": is stopping") ;
-        stop = true;
         raftState.stop();
-        listener.stop();
+        if (tcpServer != null) {
+            tcpServer.close();
+        }
+        for (Connection c : connectionPeerMap.keySet()) {
+            c.close();
+        }
+        peerServerExecutor.shutdownNow();
+    }
+
+    public boolean isStopped() {
+        return stop.get();
     }
 
     public String getBindHost() {
@@ -232,9 +247,8 @@ public class PeerServer implements NioListenerConsumer {
         return leader;
     }
 
-    public void queueSendMessage(SocketChannel c, Message m) throws Exception {
-        Peer p = socketChannelPeerMap.get(c) ;
-        p.queueSendMessage(m);
+    public void queueSendMessage(Connection c, Message m) throws Exception {
+        c.send(m.serialize());
     }
 
     public void setRaftState(State state) {
@@ -265,19 +279,17 @@ public class PeerServer implements NioListenerConsumer {
         peerServer.start() ;
     }
 
-    public void addedConnection(SocketChannel s) {
+    // inbound connections are registered when their Hello (or client hello) message arrives
 
-        // do nothing this we get hello message
-
+    @Override
+    public void onFrame(Connection c, ByteBuffer frame) {
+        MessageDispatcher.dispatch(frame, c, this);
     }
 
-    public void droppedConnection(SocketChannel s) {
-        LOG.info(" connection dropped") ;
-        removePeer(s);
-    }
-
-    public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
-        inBoundMessageCreator.submit(s, b, numBytes);
+    @Override
+    public void onClosed(Connection c) {
+        LOG.info(getServerId() + ": connection from " + c.remoteAddress() + " dropped") ;
+        removePeer(c);
     }
 
     public void setLastLeaderHeartBeatTs(long ts) {
@@ -308,28 +320,31 @@ public class PeerServer implements NioListenerConsumer {
         peer.queueSendMessage(cm);
     }
 
-    public void redirect(SocketChannel sc, Redirect r) throws Exception {
+    public void redirect(Connection c, Redirect r) {
         LOG.info("redirecting to "+r.getHost() + ":" +r.getHostPort());
-        // keep the current connection around
-        // As it could be used later start a new connection
-        LOG.info("Connecting to") ;
-        PeerClient peer = new PeerClient(r.getHost(), r.getHostPort(),this);
-        peer.start();
-        HelloMessage m = new HelloMessage(getBindHost(),getBindPort());
-        peer.queueSendMessage(m.serialize());
-        LOG.info("Done write hello to q") ;
+        // keep the current connection around, it could be used later.
+        // Connect off the reader thread: a handler must not block, or later frames on c (e.g. votes) stall.
+        // Single attempt: a redirect to a dead leader is dropped; the election timeout recovers.
+        Thread.ofVirtual().name("redirect-" + r.getHost() + ":" + r.getHostPort()).start(() -> {
+            try {
+                PeerClient peer = new PeerClient(r.getHost(), r.getHostPort(), this);
+                peer.connect();
+                peer.queueSendMessage(new HelloMessage(getBindHost(), getBindPort()));
+            } catch (Exception e) {
+                LOG.info(getServerId() + ": redirect to " + r.getHost() + ":" + r.getHostPort() + " failed: " + e.getMessage());
+            }
+        });
     }
 
 
-    public void removePeer(SocketChannel sc) {
-        LOG.info(getServerId() + ": removed peer for dropped connection");
-        Peer p = socketChannelPeerMap.get(sc) ;
+    public void removePeer(Connection c) {
+        Peer p = connectionPeerMap.remove(c) ;
         Member m = null ;
         if (p != null) {
             m = p.member() ;
         }
-        socketChannelPeerMap.remove(sc) ;
         if (m != null) {
+            LOG.info(getServerId() + ": removed peer " + m + " for dropped connection");
             connectedMembersMap.remove(m);
             memberPeerDataMap.remove(m);
             synchronized (members) {
@@ -338,46 +353,45 @@ public class PeerServer implements NioListenerConsumer {
         }
     }
 
-    public void addPeer(SocketChannel sc, Peer p) {
+    public void addPeer(Connection c, Peer p) {
         synchronized (members) {
             members.add(p.member());
         }
-        socketChannelPeerMap.put(sc, p) ;
+        connectionPeerMap.put(c, p) ;
         connectedMembersMap.put(p.member(), p);
         memberPeerDataMap.put(p.member(), new PeerData(p.member().getHostString(), p.member().getPort()));
     }
 
-    public void decrementNextIndex(SocketChannel sc) {
-        Peer p = socketChannelPeerMap.get(sc);
+    public void decrementNextIndex(Connection c) {
+        Peer p = connectionPeerMap.get(c);
         Member m = p.member();
         PeerData v = memberPeerDataMap.get(m);
         v.decrementNextIndexToReplicate();
     }
 
-    public void addPeer(SocketChannel sc, String hostString, int port) {
+    public void addPeer(Connection c, String hostString, int port) {
         Member m = new Member(hostString, port, false);
-        ListenerPeer l = new ListenerPeer(listener, m, sc) ;
+        ConnectionPeer peer = new ConnectionPeer(m, c) ;
         // clusterInfo.addMember(m);
         synchronized (members) {
             members.add(m);
         }
 
-        connectedMembersMap.put(m, l) ;
+        connectedMembersMap.put(m, peer) ;
         memberPeerDataMap.put(m, new PeerData(hostString, port));
-        socketChannelPeerMap.put(sc, l);
+        connectionPeerMap.put(c, peer);
     }
 
-    public void addRaftClient(SocketChannel sc) {
-        ListenerPeer l = new ListenerPeer(listener, null, sc) ;
-        socketChannelPeerMap.put(sc, l);
+    public void addRaftClient(Connection c) {
+        connectionPeerMap.put(c, new ConnectionPeer(null, c));
     }
 
-    public Peer getPeer(SocketChannel s) {
-        return socketChannelPeerMap.get(s) ;
+    public Peer getPeer(Connection c) {
+        return connectionPeerMap.get(c) ;
     }
 
-    public PeerData getPeerData(SocketChannel s) {
-        Peer p = getPeer(s) ;
+    public PeerData getPeerData(Connection c) {
+        Peer p = getPeer(c) ;
         return memberPeerDataMap.get(p.member());
     }
 
@@ -386,12 +400,10 @@ public class PeerServer implements NioListenerConsumer {
         if (p != null) {
             return p;
         }
-        // fix race condition
-        // establish connection
+        // establish connection; a single attempt, so a dead member fails fast instead of blocking the caller
         PeerClient pc = new PeerClient(m.getHostString(), m.getPort(), this) ;
-        pc.start();
-        HelloMessage hm = new HelloMessage(bindHost, bindPort);
-        pc.queueSendMessage(hm.serialize());
+        pc.connect();
+        pc.queueSendMessage(new HelloMessage(bindHost, bindPort));
         p = connectedMembersMap.get(m) ;
         if (p == null) {
             throw new RuntimeException("Connection not established to "+
@@ -432,7 +444,12 @@ public class PeerServer implements NioListenerConsumer {
     }
 
     public void startTask(Runnable r) {
-        peerServerExecutor.submit(r);
+        try {
+            peerServerExecutor.submit(r);
+        } catch (RejectedExecutionException e) {
+            // a state change raced with stop(); nothing should run after stop
+            LOG.debug(getServerId() + ": not starting task after stop");
+        }
     }
 }
 

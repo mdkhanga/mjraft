@@ -6,13 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class ClusterInfoHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(ClusterInfoHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         ClusterInfoMessage message = ClusterInfoMessage.deserialize(readBuffer.rewind()) ;
         // LOG.info(peerServer.getServerId()+":Received clusterInfoMsg:" + message.toString());

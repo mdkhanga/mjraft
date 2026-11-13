@@ -12,23 +12,23 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class HelloHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(HelloHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         HelloMessage message = HelloMessage.deserialize(readBuffer.rewind());
-        peerServer.addPeer(socketChannel, message.getHostString(), message.getHostPort());
+        peerServer.addPeer(connection, message.getHostString(), message.getHostPort());
         // LOG.info(peerServer.getServerId() + "Registered peer " + message.getHostString() + ":" + message.getHostPort());
 
         if (peerServer.isElectionInProgress()) {
 
             // LOG.info(peerServer.getServerId() + ":Election in progress return error");
             Error e = new Error(1, "Election in progress. Please wait.");
-            peerServer.queueSendMessage(socketChannel,
+            peerServer.queueSendMessage(connection,
                     new Response(0, 1, e.toBytes()));
 
         } else if (!peerServer.isLeader()) {
@@ -36,7 +36,7 @@ public class HelloHandler implements MessageHandler {
             Member leader = peerServer.getLeader();
             LOG.info(peerServer.getServerId() + ":Redirecting to leader " + leader.getHostString() + ":" + leader.getPort());
             Redirect r = new Redirect(leader.getHostString(), leader.getPort());
-            peerServer.queueSendMessage(socketChannel,
+            peerServer.queueSendMessage(connection,
                     new Response(0, 2, r.toBytes()));
 
         }

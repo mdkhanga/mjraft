@@ -9,22 +9,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class AppendEntriesHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(AppendEntriesHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
-        PeerData d = peerServer.getPeerData(socketChannel);
+        PeerData d = peerServer.getPeerData(connection);
 
         // AppendRPC rule 1 5.1 Page 4
         if (message.getTerm() < peerServer.getTerm()) {
             AppendEntriesResponse resp = new AppendEntriesResponse(-1, peerServer.getTerm(), false);
             ByteBuffer b = resp.serialize();
-            peerServer.queueSendMessage(socketChannel, resp);
+            peerServer.queueSendMessage(connection, resp);
         }
 
         if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||
@@ -53,7 +53,7 @@ public class AppendEntriesHandler implements MessageHandler {
 
         AppendEntriesResponse resp = new AppendEntriesResponse(index, peerServer.getTerm(), entryResult);
         ByteBuffer b = resp.serialize();
-        peerServer.queueSendMessage(socketChannel, resp);
+        peerServer.queueSendMessage(connection, resp);
 
     }
 }

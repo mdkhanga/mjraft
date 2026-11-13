@@ -9,13 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class RequestVoteHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(RequestVoteHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         RequestVoteMessage message = RequestVoteMessage.deserialize(readBuffer.rewind());
 
@@ -64,7 +64,7 @@ public class RequestVoteHandler implements MessageHandler {
                 message.getCandidatePort(),
                 vote);
 
-        peerServer.queueSendMessage(socketChannel, requestVoteResponseMessage);
+        peerServer.queueSendMessage(connection, requestVoteResponseMessage);
 
     }
 }

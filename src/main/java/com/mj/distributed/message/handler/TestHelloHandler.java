@@ -11,17 +11,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class TestHelloHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(TestHelloHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         LOG.info(peerServer.getServerId()+":Received a TestClient hello message");
-        peerServer.addRaftClient(socketChannel);
-        peerServer.queueSendMessage(socketChannel, new TestClientHelloResponse());
+        peerServer.addRaftClient(connection);
+        peerServer.queueSendMessage(connection, new TestClientHelloResponse());
 
     }
 }

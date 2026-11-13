@@ -7,16 +7,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import com.mj.distributed.tcp.Connection;
 
 public class GetClusterInfoHandler implements MessageHandler {
 
     private static Logger LOG  = LoggerFactory.getLogger(GetClusterInfoHandler.class);
 
-    public void handle(ByteBuffer readBuffer, SocketChannel socketChannel, PeerServer peerServer) throws Exception {
+    public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
         LOG.info(peerServer.getServerId()+":Received request for clusterInfo");
         ClusterInfoMessage cm = new ClusterInfoMessage(peerServer.getClusterInfo());
         // LOG.info(peerServer.getServerId()+":cm message size = "+cm.serialize().limit());
-        peerServer.queueSendMessage(socketChannel, cm);
+        peerServer.queueSendMessage(connection, cm);
     }
 }
