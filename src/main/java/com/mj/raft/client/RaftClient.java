@@ -1,195 +1,110 @@
 package com.mj.raft.client;
 
 import com.mj.distributed.message.*;
-import com.mj.distributed.model.Error;
 import com.mj.distributed.model.Redirect;
-import com.mj.distributed.tcp.nio.NioCaller;
-import com.mj.distributed.tcp.nio.NioCallerConsumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mj.distributed.tcp.BlockingConnection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
+import java.time.Duration;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class RaftClient implements NioCallerConsumer {
+public class RaftClient implements AutoCloseable {
 
-    private String hostString;
-    private int port;
-    NioCaller nioCaller;
+    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    static final Duration DEFAULT_RESPONSE_TIMEOUT = Duration.ofSeconds(10);
+    static final int MAX_REDIRECTS = 5;
+
+    private final String hostString;
+    private final int port;
+    private final Duration responseTimeout;
+    private BlockingConnection connection;
     private final AtomicInteger seq = new AtomicInteger(1);
-    private Integer messageWaitingResponse ;
-    private volatile Message response;
-    Logger LOG = LoggerFactory.getLogger(RaftClient.class);
 
     public RaftClient(String host, int port) {
-
-        this.hostString = host;
-        this.port = port;
+        this(host, port, DEFAULT_RESPONSE_TIMEOUT);
     }
 
+    public RaftClient(String host, int port, Duration responseTimeout) {
+        this.hostString = host;
+        this.port = port;
+        this.responseTimeout = responseTimeout;
+    }
+
+    /**
+     * Connects, following redirects to the leader.
+     *
+     * @return the status of the server's Response: 1 when connected to the leader,
+     *         0 when an election is in progress
+     */
     public int connect() throws Exception {
 
-        boolean connectedOrError = false;
-
-        String hostToTry = hostString ;
+        String hostToTry = hostString;
         int portToTry = port;
 
-        while (!connectedOrError) {
+        for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
 
             Response r = _connect(hostToTry, portToTry);
 
-            if (r.getStatus() == 0 && r.getType() == 1) {
-                connectedOrError = true;
-                return 0;
-            } else if (r.getStatus() == 0 && r.getType() == 2) {
-                        // redirect
-                Redirect rd = Redirect.fromBytes(r.getDetails()) ;
-                nioCaller.stop();
+            if (r.getStatus() == 0 && r.getType() == 2) {
+                // redirect
+                Redirect rd = Redirect.fromBytes(r.getDetails());
+                connection.close();
                 hostToTry = rd.getHost();
                 portToTry = rd.getHostPort();
             } else {
-                connectedOrError = true;
                 return r.getStatus();
             }
-
         }
 
-        return -1;
+        throw new IOException("Gave up after " + MAX_REDIRECTS + " redirects, last to " + hostToTry + ":" + portToTry);
     }
 
     Response _connect(String host, int port) throws Exception {
 
-        nioCaller = new NioCaller(host, port, "raftclient", -1, this);
-        nioCaller.start();
-        RaftClientHello hello = new RaftClientHello();
-        messageWaitingResponse = 0;
-        nioCaller.queueSendMessage(hello.serialize());
-
-        synchronized (messageWaitingResponse) {
-
-            while (response == null) {
-
-                messageWaitingResponse.wait();
-
-            }
-
-            if (response instanceof Response) {
-                Response r = (Response) response;
-                response = null;
-
-                return r;
-
-            } else {
-                throw new RuntimeException("Response to Hello not understood");
-            }
-        }
-
-
-
-
-
+        connection = BlockingConnection.open(host, port, CONNECT_TIMEOUT, responseTimeout);
+        ByteBuffer reply = connection.call(new RaftClientHello(), MessageType.Response);
+        return Response.deserialize(reply);
     }
 
-
+    @Override
     public void close() throws Exception {
-        nioCaller.stop();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     public void send(int value) throws Exception {
 
-        byte[] val = ByteBuffer.allocate(4).putInt(value).array() ;
-        RaftClientAppendEntry entry = new RaftClientAppendEntry(val);
-        nioCaller.queueSendMessage(entry.serialize());
-
+        byte[] val = ByteBuffer.allocate(4).putInt(value).array();
+        send(val);
     }
 
     public void send(byte[] val) throws Exception {
 
-        RaftClientAppendEntry entry = new RaftClientAppendEntry(val);
-        nioCaller.queueSendMessage(entry.serialize());
-
+        connection.send(new RaftClientAppendEntry(val));
     }
 
     public List<byte[]> get(int start, int count) throws Exception {
 
-        Integer id = seq.getAndIncrement();
-        GetServerLog gsLog = new GetServerLog(id, start, count, (byte)0);
-        response = null ;
-        nioCaller.queueSendMessage(gsLog.serialize());
-        messageWaitingResponse = id;
-        synchronized (messageWaitingResponse) {
-
-            while(response == null ) {
-
-                messageWaitingResponse.wait();
-
-            }
-
-            GetServerLogResponse r = (GetServerLogResponse) response ;
-            return r.getEntries();
-        }
-    }
-
-    public void addedConnection(SocketChannel s) {
-
-    }
-
-    public void droppedConnection(SocketChannel s) {
-
-    }
-
-    public void consumeMessage(SocketChannel s, int numBytes, ByteBuffer b) {
-
-        try {
-
-            // LOG.info("Raft client Received a response message "+numBytes);
-
-            synchronized (messageWaitingResponse) {
-
-                // FIXME: could be a partial message or multiple messages
-                int messageSize = b.getInt();
-                int messageType = b.getInt() ;
-
-                // LOG.info("Raft client Received a response messageType "+ messageType);
-
-                if (messageType == MessageType.RaftClientHelloResponse.value()) {
-                    response = RaftClientHelloResponse.deserialize(b.rewind());
-                    messageWaitingResponse.notify();
-                } else if (messageType == MessageType.GetServerLogResponse.value()) {
-                    response = GetServerLogResponse.deserialize(b.rewind());
-                    messageWaitingResponse.notify();
-                } else if (messageType == MessageType.Response.value()) {
-                    response = Response.deserialize(b.rewind());
-                    messageWaitingResponse.notify();
-                } else  {
-                    throw new RuntimeException("RaftClient received unknown message");
-                }
-
-            }
-        } catch(Exception e) {
-            LOG.error("Error deserializing message",e) ;
-        }
-
-
+        GetServerLog gsLog = new GetServerLog(seq.getAndIncrement(), start, count, (byte) 0);
+        ByteBuffer reply = connection.call(gsLog, MessageType.GetServerLogResponse);
+        return GetServerLogResponse.deserialize(reply).getEntries();
     }
 
     public static void main(String[] args) throws Exception {
 
-        RaftClient client = new RaftClient(args[0],Integer.parseInt(args[1]));
+        RaftClient client = new RaftClient(args[0], Integer.parseInt(args[1]));
         client.connect();
-//        client.send(23);
 
         Scanner scanner = new Scanner(System.in);
 
-        while(true) {
+        while (true) {
 
-            System.out.print("Enter a number:") ;
+            System.out.print("Enter a number:");
             String s = scanner.nextLine();
-            // client.send(Integer.valueOf(s));
             client.send(s.getBytes());
 
         }
