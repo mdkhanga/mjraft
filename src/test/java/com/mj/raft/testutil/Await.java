@@ -23,4 +23,20 @@ public final class Await {
             Thread.sleep(POLL_INTERVAL_MS);
         }
     }
+
+    /**
+     * Polls condition for the whole duration, failing as soon as it is false.
+     * For checking that something bad never happens, e.g. a minority electing a leader.
+     */
+    public static void holds(Duration duration, String what, BooleanSupplier condition) throws InterruptedException {
+        long start = System.nanoTime();
+        long end = start + duration.toNanos();
+        while (System.nanoTime() < end) {
+            if (!condition.getAsBoolean()) {
+                throw new AssertionError("After " + Duration.ofNanos(System.nanoTime() - start).toMillis()
+                        + "ms no longer true: " + what);
+            }
+            Thread.sleep(POLL_INTERVAL_MS);
+        }
+    }
 }

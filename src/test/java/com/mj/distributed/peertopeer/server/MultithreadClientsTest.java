@@ -31,36 +31,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class MultithreadClientsTest {
 
     static int[] ports;
-    static PeerServer leader;
-    static PeerServer server1;
-    static PeerServer server2;
+    static PeerServer[] servers;
+    static PeerServer leader; // elected, so not necessarily ports[0]
 
     ExecutorService executorService = Executors.newFixedThreadPool(11) ;
 
     @BeforeAll
     public static void init() throws Exception {
         ports = Ports.free(3);
-
-        leader = new PeerServer(ports[0]);
-        leader.start() ;
-
-        String[] seeds = { "localhost:" + ports[0] };
-
-        server1 = new PeerServer(ports[1], seeds);
-        server1.start();
-
-        server2 = new PeerServer(ports[2], seeds);
-        server2.start();
-
-        Await.until(Duration.ofSeconds(20), "followers see the initial leader",
-                () -> Servers.allSeeLeader(ports[0], server1, server2));
+        servers = Servers.startCluster(ports);
+        leader = Servers.awaitLeader(Duration.ofSeconds(30), servers);
     }
 
     @AfterAll
     public static void destroy() throws Exception {
-        leader.stop();
-        server1.stop();
-        server2.stop();
+        Servers.stopAll(servers);
     }
 
     @Test
@@ -93,7 +78,7 @@ public class MultithreadClientsTest {
         }
 
         Await.until(Duration.ofSeconds(30), "all servers have 10 log entries",
-                () -> Servers.allHaveLogSize(inputs.size(), leader, server1, server2));
+                () -> Servers.allHaveLogSize(inputs.size(), servers));
 
         for (int i = 0 ; i < 10 ; i++) {
 
@@ -146,7 +131,7 @@ public class MultithreadClientsTest {
 
             startGate.await() ;
 
-            RaftClient raftClient = new RaftClient("localhost", ports[0]);
+            RaftClient raftClient = new RaftClient("localhost", leader.getBindPort());
             raftClient.connect();
 
             raftClient.send(val);

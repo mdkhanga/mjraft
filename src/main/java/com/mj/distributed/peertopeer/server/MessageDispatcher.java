@@ -20,15 +20,12 @@ final class MessageDispatcher {
 
     private static final Map<MessageType, MessageHandler> handlerMap = new EnumMap<>(MessageType.class);
     static {
-        handlerMap.put(MessageType.Hello, new HelloHandler());
-        handlerMap.put(MessageType.Response, new ResponseHandler());
         handlerMap.put(MessageType.TestClientHello, new TestHelloHandler());
         handlerMap.put(MessageType.AppendEntriesResponse, new AppendEntriesResponseHandler());
         handlerMap.put(MessageType.AppendEntries, new AppendEntriesHandler());
         handlerMap.put(MessageType.RequestVote, new RequestVoteHandler());
         handlerMap.put(MessageType.RequestVoteResponse, new RequestVoteResponseHandler());
         handlerMap.put(MessageType.RaftClientHello, new RaftClientHelloHandler());
-        handlerMap.put(MessageType.ClusterInfo, new ClusterInfoHandler());
         handlerMap.put(MessageType.RaftClientAppendEntry, new RaftClientAppendEntryHandler());
         handlerMap.put(MessageType.GetServerLog, new GetServerLogHandler());
         handlerMap.put(MessageType.GetClusterInfo, new GetClusterInfoHandler());

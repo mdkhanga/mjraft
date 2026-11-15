@@ -8,15 +8,16 @@ import java.util.List;
 
 public class ClusterInfo {
 
-    private final Member leader ;
+    private final Member leader ; // null when no leader is known
     private final List<Member> members ;
 
 
-
+    /**
+     * @param ms every member of the cluster; the leader is one of them, not added separately
+     */
     public ClusterInfo(Member leader, List<Member> ms) {
         this.leader = leader;
         this.members = ms ;
-        members.add(leader);
     }
 
     public void addMember(Member m) {
@@ -35,8 +36,8 @@ public class ClusterInfo {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(out);
 
-        byte[] leaderBytes = leader.toBytes();
-        d.writeInt(leaderBytes.length);
+        byte[] leaderBytes = leader == null ? new byte[0] : leader.toBytes();
+        d.writeInt(leaderBytes.length); // 0 = no leader
         d.write(leaderBytes);
 
         d.writeInt(members.size());
@@ -60,7 +61,7 @@ public class ClusterInfo {
         int numleaderBytes = din.readInt();
         byte[] leaderbytes = new byte[numleaderBytes];
         din.read(leaderbytes, 0, numleaderBytes);
-        Member leader = Member.fromBytes(leaderbytes);
+        Member leader = numleaderBytes == 0 ? null : Member.fromBytes(leaderbytes);
 
         ClusterInfo cinfo = new ClusterInfo(leader, new ArrayList<Member>());
 

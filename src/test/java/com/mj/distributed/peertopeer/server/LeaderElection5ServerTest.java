@@ -37,29 +37,18 @@ public class LeaderElection5ServerTest {
     public static void init() throws Exception {
         ports = Ports.free(5);
 
-        PeerServer first = new PeerServer(ports[0]);
-        first.start();
-        alive.put(ports[0], first);
-
-        String[] seeds = { "localhost:" + ports[0] };
-
-        for (int i = 1; i < ports.length; i++) {
-            PeerServer s = new PeerServer(ports[i], seeds);
-            s.start();
-            alive.put(ports[i], s);
+        for (PeerServer s : Servers.startCluster(ports)) {
+            alive.put(s.getBindPort(), s);
         }
 
-        // followers learn about each other only from the leader's periodic ClusterInfo gossip
-        Await.until(Duration.ofSeconds(30), "all servers see the leader and know every member",
-                () -> Servers.allSeeLeader(ports[0], aliveServers())
-                        && Servers.allKnowMembers(5, aliveServers()));
+        PeerServer leader = Servers.awaitLeader(Duration.ofSeconds(30), aliveServers());
 
-        RaftClient raftClient = new RaftClient("localhost", ports[0]);
+        RaftClient raftClient = new RaftClient("localhost", leader.getBindPort());
         raftClient.connect();
 
         raftClient.send(23);
 
-        // voters reject candidates while their own log is empty, so the entry must replicate first
+        // the failover election then runs with a non-empty log on every server
         Await.until(Duration.ofSeconds(20), "the entry replicates to all servers",
                 () -> Servers.allHaveLogSize(1, aliveServers()));
     }
@@ -80,30 +69,30 @@ public class LeaderElection5ServerTest {
     public void leaderElectionOn2Failure() throws Exception {
 
 
-        TestClient ts = new TestClient("localhost", ports[1]);
+        int firstLeader = Servers.agreedLeader(aliveServers()).orElseThrow().getBindPort();
+        List<Integer> followers = new ArrayList<>(alive.keySet());
+        followers.remove(Integer.valueOf(firstLeader));
+
+        TestClient ts = new TestClient("localhost", followers.get(0));
         ts.connect();
         ClusterInfo cs1 = ts.getClusterInfo();
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(firstLeader, cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
 
-        TestClient ts2 = new TestClient("localhost", ports[2]);
+        TestClient ts2 = new TestClient("localhost", followers.get(1));
         ts2.connect();
         cs1 = ts2.getClusterInfo();
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(firstLeader, cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
-        stop(ports[0]);
+        stop(firstLeader);
 
-        PeerServer s1 = alive.get(ports[1]);
-        PeerServer s2 = alive.get(ports[2]);
-        Await.until(Duration.ofSeconds(60), "servers agree on a new leader after the first failure",
-                () -> alive.containsKey(Servers.leaderPort(s1))
-                        && s1.getLeader().equals(s2.getLeader()));
+        Servers.awaitLeader(Duration.ofSeconds(60), aliveServers());
 
         // check for new leader
         cs1 = ts2.getClusterInfo();
-        assertNotEquals(ports[0], cs1.getLeader().getPort());
+        assertNotEquals(firstLeader, cs1.getLeader().getPort());
 
         ClusterInfo cs2 = ts.getClusterInfo();
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
@@ -113,7 +102,7 @@ public class LeaderElection5ServerTest {
         Thread.sleep(1000);
 
         cs1 = ts2.getClusterInfo();
-        assertNotEquals(ports[0], cs1.getLeader().getPort());
+        assertNotEquals(firstLeader, cs1.getLeader().getPort());
 
         cs2 = ts.getClusterInfo();
         assertEquals(cs1.getLeader().getPort(), cs2.getLeader().getPort());
@@ -122,12 +111,9 @@ public class LeaderElection5ServerTest {
         int secondLeader = cs2.getLeader().getPort();
         stop(secondLeader);
 
+        // 3 of 5 left: still a majority of the configured cluster
+        Servers.awaitLeader(Duration.ofSeconds(60), aliveServers());
         List<Integer> aliveList = new ArrayList<>(alive.keySet());
-        PeerServer a = alive.get(aliveList.get(0));
-        PeerServer b = alive.get(aliveList.get(1));
-        Await.until(Duration.ofSeconds(60), "servers agree on a new leader after the second failure",
-                () -> alive.containsKey(Servers.leaderPort(a))
-                        && a.getLeader().equals(b.getLeader()));
 
         TestClient ts4 = new TestClient("localhost", aliveList.get(0));
         ts4.connect();

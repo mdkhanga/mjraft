@@ -2,7 +2,6 @@ package com.mj.raft.client;
 
 import com.mj.distributed.message.Response;
 import com.mj.distributed.peertopeer.server.PeerServer;
-import com.mj.raft.testutil.Await;
 import com.mj.raft.testutil.Ports;
 import com.mj.raft.testutil.Servers;
 import org.junit.jupiter.api.AfterAll;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -21,40 +21,27 @@ import static org.junit.jupiter.api.Assertions.*;
 class RaftClientTest {
 
     static int[] ports;
+    static PeerServer[] servers;
     static PeerServer leader;
-    static PeerServer server1;
-    static PeerServer server2;
+    static int followerPort;
 
     @BeforeAll
     public static void init() throws Exception {
         ports = Ports.free(3);
-
-        leader = new PeerServer(ports[0]);
-        leader.start() ;
-
-        String[] seeds = { "localhost:" + ports[0] };
-
-        server1 = new PeerServer(ports[1], seeds);
-        server1.start();
-
-        server2 = new PeerServer(ports[2], seeds);
-        server2.start();
-
-        Await.until(Duration.ofSeconds(20), "followers see the initial leader",
-                () -> Servers.allSeeLeader(ports[0], server1, server2));
+        servers = Servers.startCluster(ports);
+        leader = Servers.awaitLeader(Duration.ofSeconds(30), servers);
+        followerPort = Arrays.stream(ports).filter(p -> p != leader.getBindPort()).findFirst().orElseThrow();
     }
 
     @AfterAll
     public static void destroy() throws Exception {
-        leader.stop();
-        server1.stop();
-        server2.stop();
+        Servers.stopAll(servers);
     }
 
     @Test
     public void ClientRedirect() throws Exception {
 
-        RaftClient rc = new RaftClient("localhost",ports[1]) ;
+        RaftClient rc = new RaftClient("localhost", followerPort) ;
 
         int ret = rc.connect() ;
 
@@ -65,9 +52,9 @@ class RaftClientTest {
     @Test
     void _connectLeader() throws Exception {
 
-        RaftClient rc = new RaftClient("localhost",ports[0]) ;
+        RaftClient rc = new RaftClient("localhost", leader.getBindPort()) ;
 
-        Response r = rc._connect("localhost",ports[0]) ;
+        Response r = rc._connect("localhost", leader.getBindPort()) ;
 
         assertEquals(1, r.getStatus());
 
@@ -76,9 +63,9 @@ class RaftClientTest {
     @Test
     void _connectNotLeader() throws Exception {
 
-        RaftClient rc = new RaftClient("localhost",ports[2]) ;
+        RaftClient rc = new RaftClient("localhost", followerPort) ;
 
-        Response r = rc._connect("localhost",ports[2]) ;
+        Response r = rc._connect("localhost", followerPort) ;
 
         assertEquals(0, r.getStatus());
         assertEquals(2, r.getType());

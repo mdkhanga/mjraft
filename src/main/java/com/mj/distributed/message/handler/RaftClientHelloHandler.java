@@ -21,7 +21,7 @@ public class RaftClientHelloHandler implements MessageHandler {
         LOG.info(peerServer.getServerId()+":Received a RaftClientHello message") ;
         peerServer.addRaftClient(connection);
 
-        if (peerServer.isElectionInProgress()) {
+        if (peerServer.isElectionInProgress() || peerServer.getLeader() == null) {
             LOG.info(peerServer.getServerId()+":Election in progress return error") ;
             Error e = new Error(1, "Election in progress. Please wait.") ;
             peerServer.queueSendMessage(connection,

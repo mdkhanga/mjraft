@@ -28,34 +28,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class PeerServerTest {
 
     static int[] ports;
-    static PeerServer leader;
-    static PeerServer server1;
-    static PeerServer server2;
+    static PeerServer[] servers;
+    static PeerServer leader; // elected, so not necessarily ports[0]
 
     @BeforeAll
     public static void init() throws Exception {
         ports = Ports.free(3);
-
-        leader = new PeerServer(ports[0]);
-        leader.start() ;
-
-        String[] seeds = { "localhost:" + ports[0] };
-
-        server1 = new PeerServer(ports[1], seeds);
-        server1.start();
-
-        server2 = new PeerServer(ports[2], seeds);
-        server2.start();
-
-        Await.until(Duration.ofSeconds(20), "followers see the initial leader",
-                () -> Servers.allSeeLeader(ports[0], server1, server2));
+        servers = Servers.startCluster(ports);
+        leader = Servers.awaitLeader(Duration.ofSeconds(30), servers);
     }
 
     @AfterAll
     public static void destroy() throws Exception {
-        leader.stop();
-        server1.stop();
-        server2.stop();
+        Servers.stopAll(servers);
     }
 
     @Test
@@ -64,6 +49,7 @@ public class PeerServerTest {
 
         List<Integer> inputs = Arrays.asList(23,33,44,91,66);
 
+        // any server: the client is redirected to the leader
         RaftClient raftClient = new RaftClient("localhost", ports[0]);
         raftClient.connect();
 
@@ -72,7 +58,7 @@ public class PeerServerTest {
         }
 
         Await.until(Duration.ofSeconds(20), "all servers have 5 log entries",
-                () -> Servers.allHaveLogSize(5, leader, server1, server2));
+                () -> Servers.allHaveLogSize(5, servers));
 
         TestClient ts = new TestClient("localhost",ports[1]);
         ts.connect();
@@ -85,7 +71,7 @@ public class PeerServerTest {
                 = ts2.get(0,5);
         List<Integer> server3Ints = convertToIntList(server3Values) ;
 
-        // connects to a follower and is redirected to the leader
+        // redirected to the leader unless ports[1] is the leader
         RaftClient ts0 = new RaftClient("localhost",ports[1]);
         ts0.connect();
         List<byte[]> server0Values = ts0.get(0,5);
@@ -99,27 +85,27 @@ public class PeerServerTest {
     }
 
     @Test
-    public void leaderElectionOnStart() throws Exception {
+    public void allServersReportTheElectedLeader() throws Exception {
 
 
         TestClient ts = new TestClient("localhost",ports[1]);
         ts.connect();
         ClusterInfo cs1 = ts.getClusterInfo() ;
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(leader.getBindPort(), cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
 
         TestClient ts2 = new TestClient("localhost",ports[2]);
         ts2.connect();
         cs1 = ts2.getClusterInfo() ;
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(leader.getBindPort(), cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
 
         TestClient ts0 = new TestClient("localhost",ports[0]);
         ts0.connect();
         cs1 = ts0.getClusterInfo() ;
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(leader.getBindPort(), cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
     }

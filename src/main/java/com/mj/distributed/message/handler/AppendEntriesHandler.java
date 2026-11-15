@@ -3,7 +3,6 @@ package com.mj.distributed.message.handler;
 import com.mj.distributed.message.AppendEntriesMessage;
 import com.mj.distributed.message.AppendEntriesResponse;
 import com.mj.distributed.model.LogEntryWithIndex;
-import com.mj.distributed.peertopeer.server.PeerData;
 import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +17,6 @@ public class AppendEntriesHandler implements MessageHandler {
     public void handle(ByteBuffer readBuffer, Connection connection, PeerServer peerServer) throws Exception {
 
         AppendEntriesMessage message = AppendEntriesMessage.deserialize(readBuffer.rewind());
-        PeerData d = peerServer.getPeerData(connection);
 
         // AppendRPC rule 1 5.1 Page 4
         if (message.getTerm() < peerServer.getTerm()) {

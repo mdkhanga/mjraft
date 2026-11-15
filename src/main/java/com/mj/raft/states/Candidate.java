@@ -7,7 +7,6 @@ import com.mj.distributed.model.Member;
 import com.mj.distributed.model.RaftState;
 import com.mj.distributed.peertopeer.server.Peer;
 import com.mj.distributed.peertopeer.server.PeerServer;
-import com.mj.distributed.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +30,8 @@ public class Candidate implements State, Runnable {
 
     public Candidate(PeerServer p) {
         server = p ;
-        members = p.getMembers();
-        requiredVotes = Utils.majority(members.size()) ;
+        members = p.getConfig().others();
+        requiredVotes = p.getConfig().majority() ; // of the configured cluster, reachable or not
 
     }
 
@@ -44,6 +43,7 @@ public class Candidate implements State, Runnable {
 
         if (server.isElectionInProgress()) {
             LOG.info(server.getServerId()+ ":Election already in progress") ;
+            becomeFollowerIfStillCandidate();
             return;
         } else {
             newterm = server.getNextElectionTerm();
@@ -58,37 +58,29 @@ public class Candidate implements State, Runnable {
         int lastIndex = last == null ? -1 : last.getIndex();
         int lastTerm = last == null ? -1 : last.getTerm();
 
-        synchronized (members) {
-            members.forEach((m) -> {
-                try {
+        members.forEach((m) -> {
+            try {
 
-                    if (m.isLeader()) {
-                        LOG.info(server.getServerId() +":skipping "+m.getHostString() + ":" + m.getPort()) ;
-                        return ;
-                    }
-
-                    if (m.getHostString().equals(server.getBindHost()) && m.getPort() == server.getBindPort()) {
-                        LOG.info(server.getServerId() + ":skipping self") ;
-                        return ;
-                    }
-
-                    LOG.info(server.getServerId() +":Sending request vote message to "+m.getHostString()+":"+m.getPort()) ;
-
-
-                    Peer pc = server.getPeer(m);
-
-                    RequestVoteMessage rv = new RequestVoteMessage(
-                            newterm,
-                            server.getBindHost(),
-                            server.getBindPort(),
-                            lastIndex, lastTerm);
-                    pc.queueSendMessage(rv);
-                } catch (Exception e) {
-                    LOG.error("Error starting client in leader election", e);
+                Peer pc = server.getConnectedPeer(m);
+                if (pc == null) {
+                    LOG.info(server.getServerId() +":Not connected to "+m.getHostString()+":"+m.getPort()
+                            + ", no vote request sent") ;
+                    return ;
                 }
 
-            });
-        }
+                LOG.info(server.getServerId() +":Sending request vote message to "+m.getHostString()+":"+m.getPort()) ;
+
+                RequestVoteMessage rv = new RequestVoteMessage(
+                        newterm,
+                        server.getBindHost(),
+                        server.getBindPort(),
+                        lastIndex, lastTerm);
+                pc.queueSendMessage(rv);
+            } catch (Exception e) {
+                LOG.error("Error sending request vote in leader election", e);
+            }
+
+        });
 
         while(!stop) {
 
@@ -130,8 +122,16 @@ public class Candidate implements State, Runnable {
         }
 
         LOG.info("Election over for term " + newterm) ;
+        // stopped by a heartbeat from a leader, without a state change of our own
+        becomeFollowerIfStillCandidate();
         LOG.info(server.getServerId()+":Exiting candidate state") ;
 
+    }
+
+    private void becomeFollowerIfStillCandidate() {
+        if (server.getRaftState() == this && !server.isStopped()) {
+            changeState(new Follower(server));
+        }
     }
 
     @Override

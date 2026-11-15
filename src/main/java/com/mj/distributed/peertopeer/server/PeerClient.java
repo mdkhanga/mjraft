@@ -1,6 +1,5 @@
 package com.mj.distributed.peertopeer.server;
 
-import com.mj.distributed.message.Message;
 import com.mj.distributed.model.Member;
 import com.mj.distributed.tcp.Connection;
 import com.mj.distributed.tcp.ConnectionListener;
@@ -11,10 +10,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
 
 
 /**
- * Opens an outbound connection to another server and registers it as a peer.
+ * Keeps an outbound connection to one other member open for the life of the server,
+ * reconnecting with backoff whenever it drops. Messages to that member are sent on this connection;
+ * its replies come back on it too.
  *
  * Created by Manoj Khangaonkar on 10/5/2016.
  */
@@ -27,36 +29,50 @@ public class PeerClient implements ConnectionListener {
     private static final long MAX_BACKOFF_MS = 2000;
 
     private final PeerServer peerServer;
-    private final String remoteHost;
-    private final int remotePort;
+    private final Member member;
 
-    private Connection connection;
+    // completed when the current connection closes
+    private volatile CompletableFuture<Void> closed = new CompletableFuture<>();
 
-    public PeerClient(String host, int port, PeerServer p) {
-        this.remoteHost = host;
-        this.remotePort = port;
+    public PeerClient(Member member, PeerServer p) {
+        this.member = member;
         this.peerServer = p;
     }
 
     /**
-     * Single attempt. On success the peer is registered with the server before this returns.
+     * Starts connecting in the background. Returns immediately.
      */
-    public void connect() throws IOException {
-        connection = TcpClient.connect(remoteHost, remotePort, CONNECT_TIMEOUT, this);
+    public void start() {
+        Thread.ofVirtual().name("peer-client-" + member.getHostString() + ":" + member.getPort()).start(this::maintain);
+    }
+
+    private void maintain() {
+        try {
+            while (!peerServer.isStopped()) {
+                if (!connectWithRetry()) {
+                    return;
+                }
+                closed.join();
+                Thread.sleep(INITIAL_BACKOFF_MS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
      * Retries with exponential backoff until connected or the server is stopped.
      * Returns false if the server stopped first.
      */
-    public boolean connectWithRetry() throws InterruptedException {
+    private boolean connectWithRetry() throws InterruptedException {
         long backoff = INITIAL_BACKOFF_MS;
         while (!peerServer.isStopped()) {
+            closed = new CompletableFuture<>(); // before connecting: onClosed can run before connect returns
             try {
-                connect();
+                TcpClient.connect(member.getHostString(), member.getPort(), CONNECT_TIMEOUT, this);
                 return true;
             } catch (IOException e) {
-                LOG.info(peerServer.getServerId() + ": cannot connect to " + remoteHost + ":" + remotePort
+                LOG.debug(peerServer.getServerId() + ": cannot connect to " + member
                         + " (" + e.getMessage() + "), retrying in " + backoff + "ms");
                 Thread.sleep(backoff);
                 backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
@@ -65,13 +81,10 @@ public class PeerClient implements ConnectionListener {
         return false;
     }
 
-    public void queueSendMessage(Message m) throws Exception {
-        connection.send(m.serialize());
-    }
-
     @Override
     public void onOpened(Connection c) {
-        peerServer.addPeer(c, new ConnectionPeer(new Member(remoteHost, remotePort), c));
+        LOG.info(peerServer.getServerId() + ": connected to " + member);
+        peerServer.addPeer(c, new ConnectionPeer(member, c));
     }
 
     @Override
@@ -81,7 +94,8 @@ public class PeerClient implements ConnectionListener {
 
     @Override
     public void onClosed(Connection c) {
-        LOG.info(peerServer.getServerId() + ": connection to " + remoteHost + ":" + remotePort + " dropped");
+        LOG.info(peerServer.getServerId() + ": connection to " + member + " dropped");
         peerServer.removePeer(c);
+        closed.complete(null);
     }
 }

@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Leader implements State, Runnable {
 
@@ -26,8 +25,6 @@ public class Leader implements State, Runnable {
 
         LOG.info(server.getServerId()+ ":Entering leader state");
 
-        AtomicInteger count = new AtomicInteger(1);
-
         while (!stop) {
 
             try {
@@ -42,17 +39,11 @@ public class Leader implements State, Runnable {
 
                         server.sendAppendEntriesMessage(v);
 
-                        if (count.get() % 60 == 0) {
-                            server.sendClusterInfoMessage(v);
-                        }
-
                     } catch (Exception e) {
                         LOG.error("error", e);
                     }
 
                 });
-
-                count.incrementAndGet();
 
             } catch (Exception e) {
                LOG.error("Error in leader thread",e) ;

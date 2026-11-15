@@ -4,15 +4,10 @@ import com.mj.distributed.model.*;
 import com.mj.distributed.tcp.Connection;
 import com.mj.distributed.tcp.ConnectionListener;
 import com.mj.distributed.tcp.TcpServer;
-import com.mj.distributed.message.AppendEntriesMessage;
-import com.mj.distributed.message.ClusterInfoMessage;
-import com.mj.distributed.message.HelloMessage;
 import com.mj.distributed.message.Message;
-import com.mj.distributed.utils.Utils;
 import com.mj.raft.log.RaftLog;
-import com.mj.raft.states.Candidate;
 import com.mj.raft.states.Follower;
-import com.mj.raft.states.Leader;
+import com.mj.raft.states.Candidate;
 import com.mj.raft.states.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,13 +20,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class PeerServer implements ConnectionListener {
 
+    // outbound connections to other members, one per member while connected
     private final ConcurrentMap<Member, Peer> connectedMembersMap = new ConcurrentHashMap<>() ;
     private volatile ConcurrentMap<Member, PeerData> memberPeerDataMap = new ConcurrentHashMap<>() ;
-    // reverse index
+    // reverse index; also holds inbound raft client connections
     private final ConcurrentMap<Connection, Peer> connectionPeerMap = new ConcurrentHashMap<>() ;
 
-    private Set<Member> members = new HashSet<>() ;
-    private volatile Member leader ;
+    private final ClusterConfig config ;
+    private volatile Member leader ; // null until a leader is known
 
     private static Logger LOG  = LoggerFactory.getLogger(PeerServer.class) ;
 
@@ -39,16 +35,12 @@ public class PeerServer implements ConnectionListener {
     private int bindPort ;
 
     private TcpServer tcpServer;
-    private Member thisMember ;
+    private final Member thisMember ;
 
     RaftLog raftLog = new RaftLog();
 
-    volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
-            new ConcurrentHashMap<>(); // key = index, value = queue of commit responses
-
     volatile AtomicInteger currentTerm = new AtomicInteger(0);
     volatile Long lastLeaderHeartBeatTs = 0L ;
-    // volatile RaftState raftState = RaftState.follower ;
     volatile State raftState ;
     ExecutorService peerServerExecutor = Executors.newFixedThreadPool(6) ;
     private final AtomicBoolean stop = new AtomicBoolean(false) ;
@@ -57,56 +49,42 @@ public class PeerServer implements ConnectionListener {
     private volatile Candidate leaderElection ;
 
     private volatile int currentVotedTerm = -1;
-    private volatile long currentVoteTimeStamp = 0;
 
-    private String[] seeds;
+    /**
+     * A single-server cluster.
+     */
     public PeerServer(int bindPort) {
-        _peerServer( bindPort, RaftState.leader);
+        this(bindPort, List.of(new Member("localhost", bindPort)));
     }
 
-    public PeerServer(int bindPort, String[] s) {
-
-        seeds = s ;
-
-        if (seeds == null  || seeds.length == 0) {
-            _peerServer( bindPort, RaftState.leader);
-        } else {
-            _peerServer( bindPort, RaftState.follower) ;
-        }
+    /**
+     * @param members every server in the cluster, including this one. All servers must be given the same list.
+     */
+    public PeerServer(int bindPort, List<Member> members) {
+        this(new ClusterConfig(new Member("localhost", bindPort), members));
     }
 
-
-    public void _peerServer( int port, RaftState state) {
-
-        bindPort = port;
-        LOG.info("Starting server on port: " + port + " state: "+ state);
-        raftState = getStateMachine(state) ;
+    public PeerServer(ClusterConfig config) {
+        this.config = config ;
+        this.thisMember = config.self();
+        this.bindHost = thisMember.getHostString();
+        this.bindPort = thisMember.getPort();
+        LOG.info("Starting server on port: " + bindPort + " cluster: " + config.members());
+        // every server starts as a follower; the first leader is elected
+        raftState = new Follower(this) ;
     }
 
     public void start() throws Exception {
 
-        thisMember = new Member(bindHost, bindPort, true) ;
-        leader = thisMember;
-        members.add(thisMember);
-
-        // bind first so a port conflict fails start() and peers can reach us while we contact the seeds
+        // bind first so a port conflict fails start()
         tcpServer = TcpServer.start(bindHost, bindPort, this);
 
-        if (seeds != null) {
-            for (String s : seeds) {
-
-                String[] remoteaddrAndPort = s.split(":") ;
-
-                LOG.info("Connecting to " + s) ;
-                PeerClient peer = new PeerClient(remoteaddrAndPort[0],Integer.parseInt(remoteaddrAndPort[1]),this);
-                if (!peer.connectWithRetry()) {
-                    return; // stopped while connecting
-                }
-                peer.queueSendMessage(new HelloMessage(getBindHost(),getBindPort()));
-
-            }
+        for (Member m : config.others()) {
+            new PeerClient(m, this).start();
         }
-        // startStateMachine();
+
+        // the election timeout counts from startup until a leader is heard from
+        setLastLeaderHeartBeatTs(System.currentTimeMillis());
         raftState.start();
     }
 
@@ -162,11 +140,6 @@ public class PeerServer implements ConnectionListener {
         String[] parts = leaderId.split(":") ;
 
         leader = new Member(parts[0],Integer.parseInt(parts[1]));
-
-        if (raftState.raftState() == RaftState.leader || raftState.raftState() == RaftState.candidate) {
-            LOG.info(getServerId() + " Change state from leader to follower. New leader is  "+ leaderId);
-
-        }
     }
 
     public int getCurrentVotedTerm() {
@@ -186,31 +159,12 @@ public class PeerServer implements ConnectionListener {
         return bindHost+":"+bindPort;
     }
 
-    public List<Member> getMembers() {
-
-        List<Member> m = new ArrayList<>();
-
-        members.forEach((k)->{
-            m.add(k);
-        });
-
-        return m;
+    public ClusterConfig getConfig() {
+        return config;
     }
-
 
     public ClusterInfo getClusterInfo() {
-            ClusterInfo info ;
-            synchronized (members) {
-                info = new ClusterInfo(leader, new ArrayList<>(members));
-            }
-            return info;
-    }
-
-    public void setClusterInfo(ClusterInfo c) {
-        synchronized (members) {
-            members.addAll(c.getMembers());
-            leader = c.getLeader();
-        }
+        return new ClusterInfo(leader, new ArrayList<>(config.members()));
     }
 
     public void setElectionInProgress(int term, Candidate cd) {
@@ -240,7 +194,7 @@ public class PeerServer implements ConnectionListener {
     }
 
     public boolean isLeader() {
-        return leader.equals(thisMember);
+        return thisMember.equals(leader);
     }
 
     public Member getLeader() {
@@ -251,6 +205,10 @@ public class PeerServer implements ConnectionListener {
         c.send(m.serialize());
     }
 
+    public State getRaftState() {
+        return raftState;
+    }
+
     public void setRaftState(State state) {
         raftState = state ;
         if (state.raftState() == RaftState.leader) {
@@ -258,28 +216,24 @@ public class PeerServer implements ConnectionListener {
         }
     }
 
+    /**
+     * Usage: PeerServer port [host:port,host:port,...]
+     * The list names every server in the cluster, including this one. Without it, a single-server cluster starts.
+     */
     public static void main(String args[]) throws Exception {
-        if (args.length == 0 ) {
-            System.out.println("Need at least 1 argurment") ;
+        if (args.length == 0 || args.length > 2) {
+            System.out.println("Usage: mjraft <port> [host:port,host:port,...]") ;
+            System.exit(1);
         }
         int port = Integer.parseInt(args[0]) ;
-        int size = args.length   ;
-        String[] seeds = null ;
-        if (size > 1) {
-            seeds = new String[args.length-1] ;
-            int j = 0 ;
-            for (int i = 1 ; i < size ; i++) {
-                seeds[j] = args[i] ;
-                ++j ;
-            }
-
-        }
+        Member self = new Member("localhost", port);
+        ClusterConfig config = args.length == 2 ? ClusterConfig.parse(self, args[1]) : ClusterConfig.single(self);
         LOG.info("Starting server listening on port: " + port) ;
-        PeerServer peerServer = new PeerServer( port, seeds) ;
+        PeerServer peerServer = new PeerServer(config) ;
         peerServer.start() ;
     }
 
-    // inbound connections are registered when their Hello (or client hello) message arrives
+    // inbound connections from other members are not registered: we only receive on them and reply
 
     @Override
     public void onFrame(Connection c, ByteBuffer frame) {
@@ -311,55 +265,23 @@ public class PeerServer implements ConnectionListener {
         raftLog.sendAppendEntriesMessage(peer, v, getServerId(), getTerm());
     }
 
-    public void sendClusterInfoMessage(Peer peer) throws Exception {
-        ClusterInfo info;
-        synchronized (members) {
-            info = new ClusterInfo(leader, new ArrayList<>(members));
-        }
-        ClusterInfoMessage cm = new ClusterInfoMessage(info);
-        peer.queueSendMessage(cm);
-    }
-
-    public void redirect(Connection c, Redirect r) {
-        LOG.info("redirecting to "+r.getHost() + ":" +r.getHostPort());
-        // keep the current connection around, it could be used later.
-        // Connect off the reader thread: a handler must not block, or later frames on c (e.g. votes) stall.
-        // Single attempt: a redirect to a dead leader is dropped; the election timeout recovers.
-        Thread.ofVirtual().name("redirect-" + r.getHost() + ":" + r.getHostPort()).start(() -> {
-            try {
-                PeerClient peer = new PeerClient(r.getHost(), r.getHostPort(), this);
-                peer.connect();
-                peer.queueSendMessage(new HelloMessage(getBindHost(), getBindPort()));
-            } catch (Exception e) {
-                LOG.info(getServerId() + ": redirect to " + r.getHost() + ":" + r.getHostPort() + " failed: " + e.getMessage());
-            }
-        });
-    }
-
-
+    /**
+     * Forgets a closed connection. Membership is unaffected: the member still counts towards the majority.
+     */
     public void removePeer(Connection c) {
         Peer p = connectionPeerMap.remove(c) ;
-        Member m = null ;
-        if (p != null) {
-            m = p.member() ;
-        }
-        if (m != null) {
-            LOG.info(getServerId() + ": removed peer " + m + " for dropped connection");
-            connectedMembersMap.remove(m);
-            memberPeerDataMap.remove(m);
-            synchronized (members) {
-                members.remove(m);
-            }
+        if (p != null && p.member() != null) {
+            connectedMembersMap.remove(p.member(), p);
         }
     }
 
     public void addPeer(Connection c, Peer p) {
-        synchronized (members) {
-            members.add(p.member());
-        }
         connectionPeerMap.put(c, p) ;
         connectedMembersMap.put(p.member(), p);
         memberPeerDataMap.put(p.member(), new PeerData(p.member().getHostString(), p.member().getPort()));
+        if (isStopped()) {
+            c.close(); // raced with stop(), which may already have closed the others
+        }
     }
 
     public void decrementNextIndex(Connection c) {
@@ -367,19 +289,6 @@ public class PeerServer implements ConnectionListener {
         Member m = p.member();
         PeerData v = memberPeerDataMap.get(m);
         v.decrementNextIndexToReplicate();
-    }
-
-    public void addPeer(Connection c, String hostString, int port) {
-        Member m = new Member(hostString, port, false);
-        ConnectionPeer peer = new ConnectionPeer(m, c) ;
-        // clusterInfo.addMember(m);
-        synchronized (members) {
-            members.add(m);
-        }
-
-        connectedMembersMap.put(m, peer) ;
-        memberPeerDataMap.put(m, new PeerData(hostString, port));
-        connectionPeerMap.put(c, peer);
     }
 
     public void addRaftClient(Connection c) {
@@ -395,26 +304,16 @@ public class PeerServer implements ConnectionListener {
         return memberPeerDataMap.get(p.member());
     }
 
-    public Peer getPeer(Member m) throws Exception {
-        Peer p = connectedMembersMap.get(m) ;
-        if (p != null) {
-            return p;
-        }
-        // establish connection; a single attempt, so a dead member fails fast instead of blocking the caller
-        PeerClient pc = new PeerClient(m.getHostString(), m.getPort(), this) ;
-        pc.connect();
-        pc.queueSendMessage(new HelloMessage(bindHost, bindPort));
-        p = connectedMembersMap.get(m) ;
-        if (p == null) {
-            throw new RuntimeException("Connection not established to "+
-                    m.getHostString() +":"+m.getPort() + " from " +bindHost+":"+bindPort );
-        }
-        return p;
+    /**
+     * @return the open connection to m, or null if not currently connected
+     */
+    public Peer getConnectedPeer(Member m) {
+        return connectedMembersMap.get(m) ;
     }
 
     public List<Peer> getPeers() {
 
-        return new ArrayList(connectedMembersMap.values()) ;
+        return new ArrayList<>(connectedMembersMap.values()) ;
 
     }
 
@@ -424,23 +323,7 @@ public class PeerServer implements ConnectionListener {
 
 
     public void updateIndexAckCount(int index) {
-        raftLog.updateIndexAckCount(index, members.size());
-    }
-
-    public State getStateMachine(RaftState raftState) {
-        State state = new Follower(this);
-        switch (raftState) {
-            case leader:
-                state = new Leader(this);
-                break;
-            case follower:
-                break;
-            case candidate:
-                state = new Candidate(this);
-                break;
-        }
-
-        return state;
+        raftLog.updateIndexAckCount(index, config.size());
     }
 
     public void startTask(Runnable r) {
@@ -452,4 +335,3 @@ public class PeerServer implements ConnectionListener {
         }
     }
 }
-

@@ -37,27 +37,22 @@ public class TransportClusterTest {
 
     @Test
     public void valueLargerThanOldReadBufferReplicates() throws Exception {
-        int[] ports = Ports.free(3);
-        PeerServer leader = start(new PeerServer(ports[0]));
-        String[] seeds = { "localhost:" + ports[0] };
-        PeerServer server1 = start(new PeerServer(ports[1], seeds));
-        PeerServer server2 = start(new PeerServer(ports[2], seeds));
-
-        Await.until(Duration.ofSeconds(20), "followers see the initial leader",
-                () -> Servers.allSeeLeader(ports[0], server1, server2));
+        PeerServer[] cluster = Servers.startCluster(Ports.free(3));
+        servers.addAll(List.of(cluster));
+        PeerServer leader = Servers.awaitLeader(Duration.ofSeconds(30), cluster);
 
         // the NIO transport read into a fixed 8 KB buffer, so anything larger was corrupted
         byte[] value = new byte[20 * 1024];
         new Random(42).nextBytes(value);
 
-        RaftClient raftClient = new RaftClient("localhost", ports[0]);
+        RaftClient raftClient = new RaftClient("localhost", leader.getBindPort());
         raftClient.connect();
         raftClient.send(value);
 
         Await.until(Duration.ofSeconds(20), "the 20 KB entry replicates to all servers",
-                () -> Servers.allHaveLogSize(1, leader, server1, server2));
+                () -> Servers.allHaveLogSize(1, cluster));
 
-        for (PeerServer s : List.of(leader, server1, server2)) {
+        for (PeerServer s : cluster) {
             assertArrayEquals(value, s.getRaftLog().getLastEntry().getEntry(), "log entry on " + s.getServerId());
         }
 
@@ -72,7 +67,8 @@ public class TransportClusterTest {
         first.stop();
 
         // binding would throw if stop() had left the listening socket open
-        start(new PeerServer(port));
+        PeerServer second = start(new PeerServer(port));
+        Servers.awaitLeader(Duration.ofSeconds(30), second); // a single server elects itself
 
         RaftClient raftClient = new RaftClient("localhost", port);
         assertEquals(1, raftClient.connect());

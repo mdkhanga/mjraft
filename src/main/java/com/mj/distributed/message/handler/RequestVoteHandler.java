@@ -25,17 +25,19 @@ public class RequestVoteHandler implements MessageHandler {
         int requestVoteTerm = message.getTerm() ;
 
         LogEntryWithIndex lastEntry = peerServer.getRaftLog().getLastEntry();
+        int lastIndex = lastEntry == null ? -1 : lastEntry.getIndex();
+        int lastTerm = lastEntry == null ? -1 : lastEntry.getTerm();
 
         boolean vote ;
 
 
-        if ( message.getLastLogIndex() < lastEntry.getIndex() || message.getLastLogTerm() < lastEntry.getTerm()) {
+        if ( message.getLastLogIndex() < lastIndex || message.getLastLogTerm() < lastTerm) {
             vote = false ;
             LOG.info(peerServer.getServerId() + ": voted No because last Entry of candidate not current " +
                     " message lastlogIndex =" + message.getLastLogIndex() +
-                    " server lastlogIndex ="+lastEntry.getIndex() +
+                    " server lastlogIndex ="+lastIndex +
                     " message lastLogTerm = " + message.getLastLogTerm() +
-                    " server lastlogterm = " + message.getLastLogTerm());
+                    " server lastlogterm = " + lastTerm);
         }
         else if (peerServer.isElectionInProgress() && requestVoteTerm <= peerServer.getCurrentElectionTerm()) {
             vote = false ;

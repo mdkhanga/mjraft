@@ -65,23 +65,26 @@ Test reports are written to `build/reports/tests/test/index.html` and
 
 ### Command line cluster
 
-#### Start a new cluster by starting a server listening on port 5001
+Every server is given the full list of cluster members, including itself.
+The membership is fixed: a majority of this list is needed to elect a leader or commit an entry,
+so a cluster of 3 keeps working with one server down, but not with two.
+All servers start as followers and elect a leader among themselves.
+
+#### Start a three server cluster, one command per terminal
 
 ```sh
-build/install/mjraft/bin/mjraft 5001
+build/install/mjraft/bin/mjraft 5001 localhost:5001,localhost:5002,localhost:5003
 ```
-
-#### Add a second server listening on port 5002 which connects to the first
 
 ```sh
-build/install/mjraft/bin/mjraft 5002 localhost:5001
+build/install/mjraft/bin/mjraft 5002 localhost:5001,localhost:5002,localhost:5003
 ```
-
-#### Add a third server listening on port 5003 which connects to the first
 
 ```sh
-build/install/mjraft/bin/mjraft 5003 localhost:5001
+build/install/mjraft/bin/mjraft 5003 localhost:5001,localhost:5002,localhost:5003
 ```
+
+With only a port, a single server cluster starts and elects itself.
 
 #### Use RaftClient to connect to any server and send values to be replicated
 
@@ -91,24 +94,17 @@ java -cp "build/install/mjraft/lib/*" com.mj.raft.client.RaftClient localhost 50
 
 ### Embedded
 
-#### Start a new cluster by starting a server
+#### Start a three server cluster
 
 ```java
-PeerServer leader = new PeerServer(5001);
-leader.start() ;
-```
+List<Member> members = List.of(
+        new Member("localhost", 5001),
+        new Member("localhost", 5002),
+        new Member("localhost", 5003));
 
-#### Add additional servers to the cluster
-
-```java
-String[] seeds = new String[1];
-seeds[0] = "localhost:5001"; // can connect to any server
-
-PeerServer server1 = new PeerServer(5002, seeds);
-server1.start();
-
-PeerServer server2 = new PeerServer(5003, seeds);
-server2.start();
+for (Member m : members) {
+    new PeerServer(m.getPort(), members).start();
+}
 ```
 
 ### Client api

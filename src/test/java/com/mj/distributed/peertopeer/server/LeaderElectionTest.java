@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,78 +25,61 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 public class LeaderElectionTest {
 
     static int[] ports;
-    static PeerServer leader;
-    static PeerServer server1;
-    static PeerServer server2;
+    static PeerServer[] servers;
+    static PeerServer leader; // elected, so not necessarily ports[0]
 
 
     @BeforeAll
     public static void init() throws Exception {
         ports = Ports.free(3);
+        servers = Servers.startCluster(ports);
+        leader = Servers.awaitLeader(Duration.ofSeconds(30), servers);
 
-        leader = new PeerServer(ports[0]);
-        leader.start() ;
-
-        String[] seeds = { "localhost:" + ports[0] };
-
-        server1 = new PeerServer(ports[1], seeds);
-        server1.start();
-
-        server2 = new PeerServer(ports[2], seeds);
-        server2.start();
-
-        // followers learn about each other only from the leader's periodic ClusterInfo gossip
-        Await.until(Duration.ofSeconds(30), "all servers see the leader and know every member",
-                () -> Servers.allSeeLeader(ports[0], server1, server2)
-                        && Servers.allKnowMembers(3, leader, server1, server2));
-
-        RaftClient raftClient = new RaftClient("localhost", ports[0]);
+        RaftClient raftClient = new RaftClient("localhost", leader.getBindPort());
         raftClient.connect();
 
         raftClient.send(23);
 
-        // voters reject candidates while their own log is empty, so the entry must replicate first
+        // the failover election then runs with a non-empty log on every server
         Await.until(Duration.ofSeconds(20), "the entry replicates to all servers",
-                () -> Servers.allHaveLogSize(1, leader, server1, server2));
+                () -> Servers.allHaveLogSize(1, servers));
     }
 
 
     @AfterAll
     public static void destroy() throws Exception {
 
-        server1.stop();
-        server1 = null ;
-        server2.stop();
-        server2= null ;
+        Servers.stopAll(servers);
     }
 
     @Test
     public void leaderElectionOnFailure() throws Exception {
 
 
-        TestClient ts = new TestClient("localhost",ports[1]);
+        int oldLeader = leader.getBindPort();
+        PeerServer[] survivors = Arrays.stream(servers).filter(s -> s != leader).toArray(PeerServer[]::new);
+
+        TestClient ts = new TestClient("localhost", survivors[0].getBindPort());
         ts.connect();
         ClusterInfo cs1 = ts.getClusterInfo() ;
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(oldLeader, cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
 
-        TestClient ts2 = new TestClient("localhost",ports[2]);
+        TestClient ts2 = new TestClient("localhost", survivors[1].getBindPort());
         ts2.connect();
         cs1 = ts2.getClusterInfo() ;
-        assertEquals(ports[0], cs1.getLeader().getPort());
+        assertEquals(oldLeader, cs1.getLeader().getPort());
         assertEquals("localhost", cs1.getLeader().getHostString());
 
 
         leader.stop();
 
-        Await.until(Duration.ofSeconds(60), "survivors agree on a new leader",
-                () -> Servers.leaderPort(server1) != ports[0]
-                        && server1.getLeader().equals(server2.getLeader()));
+        Servers.awaitLeader(Duration.ofSeconds(60), survivors);
 
         // check for new leader
         cs1 = ts2.getClusterInfo() ;
-        assertNotEquals(ports[0], cs1.getLeader().getPort());
+        assertNotEquals(oldLeader, cs1.getLeader().getPort());
 
         ClusterInfo cs2 = ts.getClusterInfo();
         assertEquals(cs1.getLeader().getPort(),cs2.getLeader().getPort());
@@ -105,7 +89,7 @@ public class LeaderElectionTest {
         Thread.sleep(1000) ;
 
         cs1 = ts2.getClusterInfo() ;
-        assertNotEquals(ports[0], cs1.getLeader().getPort());
+        assertNotEquals(oldLeader, cs1.getLeader().getPort());
 
         cs2 = ts.getClusterInfo();
         assertEquals(cs1.getLeader().getPort(),cs2.getLeader().getPort());
