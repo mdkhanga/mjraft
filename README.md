@@ -1,13 +1,30 @@
 # mjraft
 Java implementation of the raft protocol as described by the paper https://raft.github.io/raft.pdf
 
-## Supported features
-- Log replication
-- Leader election
-- Client API to submit log entries
-- Embeddable into your distributed application
-- Redirect to leader from follower/candidate
-- Consistency check
+## Status
+
+mjraft was started in 2016 and is being revived: completing core Raft, testing it under failure,
+and modernizing it to Java 21 and virtual threads. See [docs/PLAN.md](docs/PLAN.md) for the plan.
+
+**Working today**
+- Leader election among a fixed, configured set of servers. A majority of the configured
+  cluster is required, so a minority can never elect a leader.
+- Log replication from the leader to followers
+- Client API to submit and read log entries, with redirect to the leader
+- Networking on blocking sockets and virtual threads, with length-prefixed frames
+- Unit tests, plus cluster tests that start real servers and stop some of them
+
+**Not yet implemented**
+- Durable state: term, vote and log are not yet persisted and reloaded
+- Election and replication rules exactly as in Figure 2 of the paper (election restriction,
+  commit only entries from the current term, log repair after conflicts)
+- Applying committed entries to a state machine and acknowledging clients
+- Snapshots, membership changes, linearizable reads, pre-vote
+
+**Known issues**
+- After a reconnect, the leader resends the log from the start instead of resuming.
+- A server that voted for a candidate that then died waits for a leader's heartbeat
+  before it can vote again.
 
 ## Usage
 ### Building the code
