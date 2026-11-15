@@ -52,6 +52,18 @@ class TcpConnectionTest {
     }
 
     @Test
+    void closeReleasesThePortImmediately() throws Exception {
+        TcpServer server = TcpServer.start("localhost", 0, new Recorder());
+        int port = server.localPort();
+        for (int i = 0; i < 200; i++) {
+            server.close();
+            // throws BindException if close returned before the socket was released
+            server = TcpServer.start("localhost", port, new Recorder());
+        }
+        server.close();
+    }
+
+    @Test
     void largeFrameOverSocket() throws Exception {
         Recorder serverSide = new Recorder();
         TcpServer server = server(serverSide);

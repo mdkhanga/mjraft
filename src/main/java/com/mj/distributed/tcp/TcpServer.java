@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +23,7 @@ public final class TcpServer implements AutoCloseable {
     private final ConnectionListener listener;
     private final Set<Connection> connections = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
+    private volatile Thread acceptThread;
 
     // forwards to the caller's listener and keeps the connection set current
     private final ConnectionListener tracking = new ConnectionListener() {
@@ -55,7 +57,7 @@ public final class TcpServer implements AutoCloseable {
         ss.setReuseAddress(true);
         ss.bind(new InetSocketAddress(host, port));
         TcpServer server = new TcpServer(ss, listener);
-        Thread.ofVirtual().name("tcp-accept-" + ss.getLocalPort()).start(server::acceptLoop);
+        server.acceptThread = Thread.ofVirtual().name("tcp-accept-" + ss.getLocalPort()).start(server::acceptLoop);
         return server;
     }
 
@@ -89,6 +91,15 @@ public final class TcpServer implements AutoCloseable {
             serverSocket.close();
         } catch (IOException e) {
             LOG.debug("Error closing server socket", e);
+        }
+        // While a virtual thread is blocked in accept, the JDK leaves the socket open until
+        // that thread exits. Wait for it, so the port is free once close returns.
+        try {
+            if (!acceptThread.join(Duration.ofSeconds(5))) {
+                LOG.warn("Accept thread on port " + localPort() + " did not exit");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
         for (Connection c : connections) {
             c.close();
