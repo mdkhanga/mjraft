@@ -22,9 +22,14 @@ and modernizing it to Java 21 and virtual threads. See [docs/PLAN.md](docs/PLAN.
 - Snapshots, membership changes, linearizable reads, pre-vote
 
 **Known issues**
-- After a reconnect, the leader resends the log from the start instead of resuming.
-- A server that voted for a candidate that then died waits for a leader's heartbeat
-  before it can vote again.
+- After a reconnect or restart, the leader restarts replication to that follower from the
+  first entry, which the follower rejects, so the follower may not receive new entries
+  (fixed in step 7, replication matching Figure 2).
+- A server that voted for a candidate that then failed cannot stand for election itself
+  until it hears from a leader. If every remaining server is in this state, no leader is
+  elected (fixed in step 6).
+- A server refuses to vote in a term it has seen but not voted in. This is safe, but can
+  make elections take longer (fixed in step 6).
 
 ## Usage
 ### Building the code
