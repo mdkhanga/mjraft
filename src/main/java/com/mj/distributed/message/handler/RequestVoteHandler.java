@@ -4,6 +4,7 @@ import com.mj.distributed.message.RequestVoteMessage;
 import com.mj.distributed.message.RequestVoteResponseMessage;
 import com.mj.distributed.message.TestClientHelloResponse;
 import com.mj.distributed.model.LogEntryWithIndex;
+import com.mj.distributed.model.Member;
 import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,10 +54,13 @@ public class RequestVoteHandler implements MessageHandler {
             vote = false ;
             LOG.info(peerServer.getServerId() + ": voted No because term < voted term "+peerServer.getCurrentVotedTerm());
 
+        } else if (!peerServer.recordVote(requestVoteTerm,
+                new Member(message.getCandidateHost(), message.getCandidatePort()), null)) {
+            vote = false ;
+            LOG.info(peerServer.getServerId() + ": voted No because it already voted in, or saw, term "
+                    + requestVoteTerm + " or later");
         } else {
-
-            peerServer.setElectionInProgress(message.getTerm(), null);
-            // peerServer.setCurrentVotedTerm(message.getTerm());
+            // the vote is on disk, so it survives a restart before the reply is sent
             LOG.info(peerServer.getServerId() + ": voted Yes");
             vote = true ;
         }

@@ -21,8 +21,8 @@ public class AppendEntriesHandler implements MessageHandler {
         // AppendRPC rule 1 5.1 Page 4
         if (message.getTerm() < peerServer.getTerm()) {
             AppendEntriesResponse resp = new AppendEntriesResponse(-1, peerServer.getTerm(), false);
-            ByteBuffer b = resp.serialize();
             peerServer.queueSendMessage(connection, resp);
+            return; // a stale leader: it must not become our leader or lower our term
         }
 
         if ( !message.getLeaderId().equals(peerServer.getLeaderId()) ||

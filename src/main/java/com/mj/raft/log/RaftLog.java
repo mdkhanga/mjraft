@@ -7,6 +7,7 @@ import com.mj.distributed.model.Member;
 import com.mj.distributed.peertopeer.server.Peer;
 import com.mj.distributed.peertopeer.server.PeerData;
 import com.mj.distributed.utils.Utils;
+import com.mj.raft.storage.RaftStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class RaftLog {
 
@@ -28,10 +30,22 @@ public class RaftLog {
     volatile ConcurrentHashMap<Integer,ConcurrentLinkedQueue<Integer>> ackCountMap =
             new ConcurrentHashMap<>(); // key = index, value = queue of commit responses
 
-    public RaftLog() {
+    private final RaftStorage storage;
+    // keeps the order of entries on disk and in rlog the same
+    private final ReentrantLock appendLock = new ReentrantLock();
 
+    public RaftLog(RaftStorage storage) {
+        this.storage = storage;
+    }
 
-
+    /**
+     * Replaces the in-memory log with entries loaded from storage.
+     */
+    public void restore(List<LogEntry> entries) {
+        synchronized (rlog) {
+            rlog.clear();
+            rlog.addAll(entries);
+        }
     }
 
 
@@ -77,9 +91,19 @@ public class RaftLog {
         return ret ;
     }
 
+    /**
+     * Saves the entry to storage before adding it, so an entry in the log is always on disk:
+     * a follower can acknowledge it, and a leader can count itself towards the majority.
+     */
     public void addLogEntry(int term, byte[] value) throws Exception {
-        // rlog.add(value);
-        rlog.add(new LogEntry(term, value));
+        LogEntry e = new LogEntry(term, value);
+        appendLock.lock();
+        try {
+            storage.append(List.of(e));
+            rlog.add(e);
+        } finally {
+            appendLock.unlock();
+        }
     }
 
     public List<byte[]> getLogEntries(int start, int count) {

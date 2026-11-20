@@ -63,11 +63,11 @@ public class TransportClusterTest {
     public void stopReleasesThePort() throws Exception {
         int port = Ports.free(1)[0];
 
-        PeerServer first = start(new PeerServer(port));
+        PeerServer first = start(Servers.single(port));
         first.stop();
 
         // binding would throw if stop() had left the listening socket open
-        PeerServer second = start(new PeerServer(port));
+        PeerServer second = start(Servers.single(port));
         Servers.awaitLeader(Duration.ofSeconds(30), second); // a single server elects itself
 
         RaftClient raftClient = new RaftClient("localhost", port);
@@ -77,7 +77,7 @@ public class TransportClusterTest {
 
     @Test
     public void stopCanBeCalledTwice() throws Exception {
-        PeerServer s = start(new PeerServer(Ports.free(1)[0]));
+        PeerServer s = start(Servers.single(Ports.free(1)[0]));
 
         s.stop();
         s.stop();

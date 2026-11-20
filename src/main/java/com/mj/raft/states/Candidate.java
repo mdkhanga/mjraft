@@ -10,6 +10,7 @@ import com.mj.distributed.peertopeer.server.PeerServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,9 +46,19 @@ public class Candidate implements State, Runnable {
             LOG.info(server.getServerId()+ ":Election already in progress") ;
             becomeFollowerIfStillCandidate();
             return;
-        } else {
-            newterm = server.getNextElectionTerm();
-            server.setElectionInProgress(newterm, this);
+        }
+        newterm = server.getNextElectionTerm();
+        try {
+            // votes for itself, saved before any vote request goes out
+            if (!server.recordVote(newterm, server.getThisMember(), this)) {
+                LOG.info(server.getServerId() + ":Already voted in term " + newterm + ", not standing");
+                becomeFollowerIfStillCandidate();
+                return;
+            }
+        } catch (IOException e) {
+            LOG.error(server.getServerId() + ":Could not save vote for term " + newterm + ", not standing", e);
+            becomeFollowerIfStillCandidate();
+            return;
         }
 
         // start election timer
@@ -92,7 +103,11 @@ public class Candidate implements State, Runnable {
                 LOG.info(server.getServerId()+":Won Election for term " + newterm + " with votes " + currentVoteCount.get()) ;
                 // server.setRaftState(RaftState.leader);
                 changeState(new Leader(server));
-                server.setTerm(newterm);
+                try {
+                    server.setTerm(newterm); // already saved with the vote, so this does not write
+                } catch (IOException e) {
+                    LOG.error(server.getServerId() + ":Could not save term " + newterm, e);
+                }
                 server.clearElectionInProgress();
                 break;
             }

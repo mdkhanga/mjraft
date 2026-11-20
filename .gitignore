@@ -7,3 +7,6 @@ target
 *.class
 .gradle
 build
+
+# server data directories created by running mjraft from the project root
+data/

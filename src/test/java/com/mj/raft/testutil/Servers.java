@@ -1,9 +1,15 @@
 package com.mj.raft.testutil;
 
+import com.mj.distributed.model.ClusterConfig;
 import com.mj.distributed.model.LogEntryWithIndex;
 import com.mj.distributed.model.Member;
 import com.mj.distributed.peertopeer.server.PeerServer;
+import com.mj.raft.storage.FileRaftStorage;
+import com.mj.raft.storage.InMemoryRaftStorage;
+import com.mj.raft.storage.RaftStorage;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -22,16 +28,53 @@ public final class Servers {
     }
 
     /**
-     * Starts one server per port, each configured with all the ports as the cluster.
+     * Starts one server per port, each configured with all the ports as the cluster. Nothing is kept on disk.
      */
     public static PeerServer[] startCluster(int... ports) throws Exception {
         List<Member> members = members(ports);
         PeerServer[] servers = new PeerServer[ports.length];
         for (int i = 0; i < ports.length; i++) {
-            servers[i] = new PeerServer(ports[i], members);
-            servers[i].start();
+            servers[i] = start(ports[i], members, new InMemoryRaftStorage());
         }
         return servers;
+    }
+
+    /**
+     * As {@link #startCluster(int...)}, with each server's state in its own directory under root,
+     * so a server started again with {@link #restart} finds it.
+     */
+    public static PeerServer[] startCluster(Path root, int... ports) throws Exception {
+        List<Member> members = members(ports);
+        PeerServer[] servers = new PeerServer[ports.length];
+        for (int i = 0; i < ports.length; i++) {
+            servers[i] = restart(root, ports[i], members);
+        }
+        return servers;
+    }
+
+    /**
+     * Starts a server on port with the state stored under root, as {@link #startCluster(Path, int...)} does.
+     */
+    public static PeerServer restart(Path root, int port, List<Member> members) throws Exception {
+        return start(port, members, fileStorage(root, port));
+    }
+
+    public static RaftStorage fileStorage(Path root, int port) throws IOException {
+        return FileRaftStorage.open(root.resolve(String.valueOf(port)));
+    }
+
+    /**
+     * A single-server cluster, not yet started, with nothing kept on disk.
+     */
+    public static PeerServer single(int port) {
+        Member self = new Member("localhost", port);
+        return new PeerServer(ClusterConfig.single(self), new InMemoryRaftStorage());
+    }
+
+    private static PeerServer start(int port, List<Member> members, RaftStorage storage) throws Exception {
+        PeerServer s = new PeerServer(new ClusterConfig(new Member("localhost", port), members), storage);
+        s.start();
+        return s;
     }
 
     /**

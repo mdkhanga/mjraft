@@ -10,12 +10,12 @@ and modernizing it to Java 21 and virtual threads. See [docs/PLAN.md](docs/PLAN.
 - Leader election among a fixed, configured set of servers. A majority of the configured
   cluster is required, so a minority can never elect a leader.
 - Log replication from the leader to followers
+- Durable state: term, vote and log are written to disk before a server replies, and loaded on restart
 - Client API to submit and read log entries, with redirect to the leader
 - Networking on blocking sockets and virtual threads, with length-prefixed frames
 - Unit tests, plus cluster tests that start real servers and stop some of them
 
 **Not yet implemented**
-- Durable state: term, vote and log are not yet persisted and reloaded
 - Election and replication rules exactly as in Figure 2 of the paper (election restriction,
   commit only entries from the current term, log repair after conflicts)
 - Applying committed entries to a state machine and acknowledging clients
@@ -103,6 +103,13 @@ build/install/mjraft/bin/mjraft 5003 localhost:5001,localhost:5002,localhost:500
 
 With only a port, a single server cluster starts and elects itself.
 
+Each server keeps its term, vote and log in a data directory, `data/<port>` by default.
+A restarted server picks up where it left off. To choose the directory:
+
+```sh
+build/install/mjraft/bin/mjraft 5001 localhost:5001,localhost:5002,localhost:5003 --data-dir /var/lib/mjraft
+```
+
 #### Use RaftClient to connect to any server and send values to be replicated
 
 ```sh
@@ -120,7 +127,9 @@ List<Member> members = List.of(
         new Member("localhost", 5003));
 
 for (Member m : members) {
-    new PeerServer(m.getPort(), members).start();
+    ClusterConfig config = new ClusterConfig(m, members);
+    RaftStorage storage = FileRaftStorage.open(Path.of("data", String.valueOf(m.getPort())));
+    new PeerServer(config, storage).start();
 }
 ```
 

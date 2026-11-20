@@ -9,14 +9,20 @@ import com.mj.raft.log.RaftLog;
 import com.mj.raft.states.Follower;
 import com.mj.raft.states.Candidate;
 import com.mj.raft.states.State;
+import com.mj.raft.storage.FileRaftStorage;
+import com.mj.raft.storage.PersistentState;
+import com.mj.raft.storage.RaftStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.*;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PeerServer implements ConnectionListener {
 
@@ -37,7 +43,14 @@ public class PeerServer implements ConnectionListener {
     private TcpServer tcpServer;
     private final Member thisMember ;
 
-    RaftLog raftLog = new RaftLog();
+    private final RaftStorage storage;
+    final RaftLog raftLog;
+
+    // guards storedTerm and votedFor, which must change together with what is on disk
+    private final ReentrantLock termLock = new ReentrantLock();
+    // the highest term saved to storage: the latest term seen or voted in
+    private int storedTerm;
+    private volatile Member votedFor; // in storedTerm, or null
 
     volatile AtomicInteger currentTerm = new AtomicInteger(0);
     volatile Long lastLeaderHeartBeatTs = 0L ;
@@ -51,21 +64,12 @@ public class PeerServer implements ConnectionListener {
     private volatile int currentVotedTerm = -1;
 
     /**
-     * A single-server cluster.
+     * @param storage where term, vote and log are kept across restarts. The server closes it on stop.
      */
-    public PeerServer(int bindPort) {
-        this(bindPort, List.of(new Member("localhost", bindPort)));
-    }
-
-    /**
-     * @param members every server in the cluster, including this one. All servers must be given the same list.
-     */
-    public PeerServer(int bindPort, List<Member> members) {
-        this(new ClusterConfig(new Member("localhost", bindPort), members));
-    }
-
-    public PeerServer(ClusterConfig config) {
+    public PeerServer(ClusterConfig config, RaftStorage storage) {
         this.config = config ;
+        this.storage = storage;
+        this.raftLog = new RaftLog(storage);
         this.thisMember = config.self();
         this.bindHost = thisMember.getHostString();
         this.bindPort = thisMember.getPort();
@@ -75,6 +79,14 @@ public class PeerServer implements ConnectionListener {
     }
 
     public void start() throws Exception {
+
+        PersistentState saved = storage.load();
+        storedTerm = saved.term();
+        votedFor = saved.votedFor();
+        currentTerm.set(saved.term());
+        raftLog.restore(saved.log());
+        LOG.info(getServerId() + ": loaded term " + saved.term() + ", vote " + saved.votedFor()
+                + ", " + saved.log().size() + " log entries");
 
         // bind first so a port conflict fails start()
         tcpServer = TcpServer.start(bindHost, bindPort, this);
@@ -105,6 +117,7 @@ public class PeerServer implements ConnectionListener {
             c.close();
         }
         peerServerExecutor.shutdownNow();
+        storage.close();
     }
 
     public boolean isStopped() {
@@ -123,8 +136,52 @@ public class PeerServer implements ConnectionListener {
         return currentTerm.get();
     }
 
-    public void setTerm(int t) {
-        currentTerm.set(t);
+    /**
+     * Saves t first if it is a new term. A term already saved keeps its vote.
+     */
+    public void setTerm(int t) throws IOException {
+        termLock.lock();
+        try {
+            if (t > storedTerm) {
+                storage.saveTermAndVote(t, null);
+                storedTerm = t;
+                votedFor = null;
+            }
+            currentTerm.set(t);
+        } finally {
+            termLock.unlock();
+        }
+    }
+
+    /**
+     * Votes for candidate in term, saving the vote before returning, and marks an election in progress.
+     * Refused if this server has already voted in, or seen, term or a later one, so it never votes twice in a term.
+     *
+     * @param election the election this server is running, if candidate is this server
+     * @return true if the vote was cast
+     */
+    public boolean recordVote(int term, Member candidate, Candidate election) throws IOException {
+        termLock.lock();
+        try {
+            if (term <= storedTerm) {
+                return false;
+            }
+            storage.saveTermAndVote(term, candidate);
+            storedTerm = term;
+            votedFor = candidate;
+            setElectionInProgress(term, election);
+            return true;
+        } finally {
+            termLock.unlock();
+        }
+    }
+
+    public Member getVotedFor() {
+        return votedFor;
+    }
+
+    public Member getThisMember() {
+        return thisMember;
     }
 
     public String getLeaderId() {
@@ -217,19 +274,30 @@ public class PeerServer implements ConnectionListener {
     }
 
     /**
-     * Usage: PeerServer port [host:port,host:port,...]
+     * Usage: PeerServer port [host:port,host:port,...] [--data-dir dir]
      * The list names every server in the cluster, including this one. Without it, a single-server cluster starts.
+     * The data directory defaults to data/port.
      */
     public static void main(String args[]) throws Exception {
-        if (args.length == 0 || args.length > 2) {
-            System.out.println("Usage: mjraft <port> [host:port,host:port,...]") ;
+        List<String> rest = new ArrayList<>(List.of(args));
+        Path dataDir = null;
+        int flag = rest.indexOf("--data-dir");
+        if (flag >= 0 && flag + 1 < rest.size()) {
+            dataDir = Path.of(rest.get(flag + 1));
+            rest.subList(flag, flag + 2).clear();
+        }
+        if (rest.isEmpty() || rest.size() > 2 || rest.contains("--data-dir")) {
+            System.out.println("Usage: mjraft <port> [host:port,host:port,...] [--data-dir <dir>]") ;
             System.exit(1);
         }
-        int port = Integer.parseInt(args[0]) ;
+        int port = Integer.parseInt(rest.get(0)) ;
+        if (dataDir == null) {
+            dataDir = Path.of("data", String.valueOf(port));
+        }
         Member self = new Member("localhost", port);
-        ClusterConfig config = args.length == 2 ? ClusterConfig.parse(self, args[1]) : ClusterConfig.single(self);
-        LOG.info("Starting server listening on port: " + port) ;
-        PeerServer peerServer = new PeerServer(config) ;
+        ClusterConfig config = rest.size() == 2 ? ClusterConfig.parse(self, rest.get(1)) : ClusterConfig.single(self);
+        LOG.info("Starting server listening on port: " + port + " with data in " + dataDir.toAbsolutePath()) ;
+        PeerServer peerServer = new PeerServer(config, FileRaftStorage.open(dataDir)) ;
         peerServer.start() ;
     }
 
